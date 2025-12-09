@@ -1,7 +1,8 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
-from app import db, app
+from flask import current_app
+from app import db
 from models.agendamento import Agendamento
 from models.gravacao import Gravacao
 from datetime import datetime
@@ -12,7 +13,7 @@ scheduler = BackgroundScheduler()
 def init_scheduler():
     """Inicializa o agendador"""
     scheduler.start()
-    with app.app_context():
+    with current_app.app_context():
         # Carregar agendamentos ativos
         agendamentos = Agendamento.query.filter_by(status='agendado').all()
         for agendamento in agendamentos:
@@ -61,7 +62,7 @@ def schedule_agendamento(agendamento):
 
 def execute_agendamento(agendamento_id):
     """Executa um agendamento"""
-    with app.app_context():
+    with current_app.app_context():
         agendamento = Agendamento.query.get(agendamento_id)
         if not agendamento or agendamento.status != 'agendado':
             return
