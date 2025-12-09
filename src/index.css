@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  --background: 220 65% 4%;
+  --foreground: 220 10% 95%;
+  --card: 220 50% 6%;
+  --card-foreground: 220 10% 95%;
+  --popover: 220 50% 6%;
+  --popover-foreground: 220 10% 95%;
+  --primary: 195 100% 50%;
+  --primary-foreground: 220 65% 4%;
+  --secondary: 220 30% 12%;
+  --secondary-foreground: 220 10% 95%;
+  --muted: 220 30% 12%;
+  --muted-foreground: 220 10% 60%;
+  --accent: 195 100% 50%;
+  --accent-foreground: 220 65% 4%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 220 10% 95%;
+  --border: 220 30% 18%;
+  --input: 220 30% 18%;
+  --ring: 195 100% 50%;
+  --radius: 0.75rem;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--card)) 25%, hsl(var(--secondary)) 50%, hsl(var(--muted)) 75%, hsl(var(--muted-foreground)/0.5) 100%);
+  background-attachment: fixed;
+  font-family: 'Inter', sans-serif;
+  color: hsl(var(--foreground));
+  min-height: 100vh;
+}
+
+.glass-effect {
+  background: hsl(var(--card) / 0.5);
+  backdrop-filter: blur(20px);
+  border: 1px solid hsl(var(--border));
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.radio-wave {
+  position: relative;
+  overflow: hidden;
+}
+
+.radio-wave::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -150%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, hsl(var(--primary)/0.2), transparent);
+  animation: wave 3s infinite linear;
+  transform: skewX(-25deg);
+}
+
+@keyframes wave {
+  0% { left: -150%; }
+  100% { left: 150%; }
+}
+
+.input {
+  @apply w-full px-4 py-3 rounded-lg bg-input border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200;
+}
+
+.btn {
+  @apply px-6 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105 active:scale-95;
+}
+
+.btn-primary {
+  @apply bg-gradient-to-r from-primary to-accent text-primary-foreground hover:from-primary/90 hover:to-accent/90 shadow-lg hover:shadow-primary/25;
+}
+
+.btn-secondary {
+  @apply bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border;
+}
+
+.card {
+  @apply glass-effect rounded-xl p-6 shadow-xl;
+}
+
+.radio-card {
+  @apply bg-card border border-border hover:border-primary/50 hover:bg-card/80;
+}
+
+.radio-panel-card {
+  background: linear-gradient(145deg, hsl(var(--card)), hsl(var(--secondary)));
+  position: relative;
+  overflow: hidden;
+}
+
+.radio-panel-card--shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -150%;
+  width: 100%;
+  height: 100%;
+  transform: skewX(-25deg);
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    hsl(var(--primary)/0.25) 50%,
+    transparent 100%
+  );
+  animation: shine-effect 3.5s infinite linear;
+}
+
+@keyframes shine-effect {
+  from {
+    left: -150%;
+  }
+  to {
+    left: 150%;
+  }
+}
+
+.status-active {
+  @apply bg-green-500/20 text-green-400 border border-green-500/30;
+}
+
+.status-inactive {
+  @apply bg-muted/50 text-muted-foreground border border-border;
+}
+
+.status-completed {
+  @apply bg-blue-500/20 text-blue-400 border border-blue-500/30;
+}
+
+.status-recording {
+  @apply bg-destructive/20 text-destructive-foreground border border-destructive/30 animate-pulse;
+}
+
+.status-error {
+  @apply bg-yellow-500/20 text-yellow-300 border border-yellow-500/30;
+}
