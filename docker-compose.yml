@@ -7,6 +7,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
+<<<<<<< Updated upstream
     networks:
       - app_network
     healthcheck:
@@ -14,14 +15,21 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+=======
+    networks: [app_network]
+>>>>>>> Stashed changes
 
   backend:
     build: ./backend
     container_name: clipradio_backend
     restart: unless-stopped
     depends_on:
+<<<<<<< Updated upstream
       db:
         condition: service_healthy
+=======
+      - db
+>>>>>>> Stashed changes
     ports:
       - "2027:5000"
     environment:
@@ -36,6 +44,7 @@ services:
     volumes:
       - ./backend/storage:/app/storage
       - ./backend/uploads:/app/uploads
+<<<<<<< Updated upstream
     networks:
       - app_network
     healthcheck:
@@ -44,22 +53,39 @@ services:
       timeout: 5s
       retries: 10
       start_period: 60s
+=======
+    networks: [app_network]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:5000/api/health\")' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s  # dá tempo do Postgres subir
+>>>>>>> Stashed changes
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
       args:
+<<<<<<< Updated upstream
         - VITE_API_URL=${VITE_API_URL:-http://backend:5000/api}
+=======
+        - VITE_API_URL=${VITE_API_URL}
+>>>>>>> Stashed changes
     container_name: clipradio_frontend
     restart: unless-stopped
-    ports:
-      - "2026:80"
     depends_on:
       backend:
         condition: service_healthy
+<<<<<<< Updated upstream
     networks:
       - app_network
+=======
+    ports:
+      - "2026:80"
+    networks: [app_network]
+>>>>>>> Stashed changes
 
 networks:
   app_network:
@@ -67,3 +93,7 @@ networks:
 
 volumes:
   pgdata:
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
