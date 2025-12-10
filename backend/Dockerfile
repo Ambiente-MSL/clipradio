@@ -21,12 +21,15 @@ COPY . .
 # Criar diretórios necessários
 RUN mkdir -p storage uploads storage/audio storage/clips
 
+# Tornar o script de entrada executável
+RUN chmod +x /app/entrypoint.sh
+
 # Variáveis de ambiente padrão
 ENV PYTHONUNBUFFERED=1
 ENV FLASK_APP=app.py
 
 EXPOSE 5000
 
-# Usar gunicorn com eventlet para suportar WebSocket
-CMD ["gunicorn", "--worker-class", "eventlet", "-w", "1", "--bind", "0.0.0.0:5000", "--timeout", "300", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
+# Usar o script de entrada que espera o banco
+ENTRYPOINT ["/app/entrypoint.sh"]
 

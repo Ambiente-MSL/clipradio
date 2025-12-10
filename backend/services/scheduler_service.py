@@ -13,11 +13,15 @@ scheduler = BackgroundScheduler()
 def init_scheduler():
     """Inicializa o agendador"""
     scheduler.start()
-    with current_app.app_context():
-        # Carregar agendamentos ativos
-        agendamentos = Agendamento.query.filter_by(status='agendado').all()
-        for agendamento in agendamentos:
-            schedule_agendamento(agendamento)
+    try:
+        with current_app.app_context():
+            # Carregar agendamentos ativos
+            agendamentos = Agendamento.query.filter_by(status='agendado').all()
+            for agendamento in agendamentos:
+                schedule_agendamento(agendamento)
+    except Exception as e:
+        print(f"Erro ao carregar agendamentos: {e}")
+        # Scheduler continua rodando, agendamentos serão carregados depois
 
 def schedule_agendamento(agendamento):
     """Agenda uma gravação"""
