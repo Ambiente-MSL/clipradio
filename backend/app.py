@@ -13,13 +13,22 @@ socketio = SocketIO(cors_allowed_origins="*", async_mode='eventlet')
 
 def wait_for_db(max_tries=30, delay=2):
     """Espera o banco responder antes de iniciar o scheduler."""
-    for _ in range(max_tries):
+    from sqlalchemy import create_engine, text
+    from config import Config
+    
+    # Criar engine tempor√°rio para testar conex√£o
+    engine = create_engine(Config.SQLALCHEMY_DATABASE_URI)
+    
+    for i in range(max_tries):
         try:
-            db.session.execute(db.text('SELECT 1'))
+            with engine.connect() as conn:
+                conn.execute(text('SELECT 1'))
             return
-        except OperationalError:
-            time.sleep(delay)
-    raise RuntimeError("Banco n„o respondeu a tempo")
+        except Exception:
+            if i < max_tries - 1:
+                time.sleep(delay)
+            else:
+                raise RuntimeError("Banco nao respondeu a tempo")
 
 
 def create_app():
@@ -27,12 +36,15 @@ def create_app():
     app.config.from_object(Config)
     Config.init_app(app)
     
-    # Inicializar extensıes
+    # Configurar engine options para for√ßar TCP/IP
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = Config.SQLALCHEMY_ENGINE_OPTIONS
+    
+    # Inicializar extensoes
     db.init_app(app)
     CORS(app)
     socketio.init_app(app)
     
-    # Importar modelos (apÛs db.init_app)
+    # Importar modelos (apos db.init_app)
     with app.app_context():
         from models.user import User
         from models.radio import Radio
@@ -55,17 +67,21 @@ def create_app():
     @app.route('/api/health')
     def health():
         try:
-            # Testar conex„o com banco
+            # Testar conexao com banco
             db.session.execute(db.text('SELECT 1'))
             return jsonify({'status': 'ok', 'database': 'connected'})
         except Exception as e:
             return jsonify({'status': 'error', 'database': 'disconnected', 'error': str(e)}), 500
     
-    # Inicializar scheduler
+    # Inicializar scheduler (aguardar banco estar pronto)
     from services.scheduler_service import init_scheduler
     with app.app_context():
-        wait_for_db()
-        init_scheduler()
+        try:
+            wait_for_db(max_tries=60, delay=1)  # Mais tentativas, intervalo menor
+            init_scheduler()
+        except RuntimeError as e:
+            # Log do erro mas n√£o falha a inicializa√ß√£o
+            print(f"Warning: {e}. Scheduler n√£o iniciado.")
     
     @app.errorhandler(404)
     def not_found(e):

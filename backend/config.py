@@ -6,10 +6,34 @@ load_dotenv()
 
 class Config:
     # Database
+    import urllib.parse
+    
+    _db_user = os.getenv('DB_USER', '')
+    _db_password = os.getenv('DB_PASSWORD', '')
+    _db_host = os.getenv('DB_HOST', 'db')
+    _db_port = os.getenv('DB_PORT', '5432')
+    _db_name = os.getenv('DB_NAME', '')
+    
+    # URL encode a senha para evitar problemas com caracteres especiais
+    _db_password_encoded = urllib.parse.quote_plus(_db_password) if _db_password else ''
+    
+    # Garantir que estamos usando TCP/IP explicitamente
+    # O problema é que psycopg2 pode interpretar "db" como socket Unix
+    # Vamos usar connect_args no SQLAlchemy para forçar TCP/IP
+    # Mas primeiro, vamos garantir que a URL está correta
     SQLALCHEMY_DATABASE_URI = (
-        f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}"
-        f"@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
+        f"postgresql+psycopg2://{_db_user}:{_db_password_encoded}"
+        f"@{_db_host}:{_db_port}/{_db_name}"
     )
+    
+    # Configurações adicionais para forçar TCP/IP
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'connect_args': {
+            'host': _db_host,
+            'port': int(_db_port),
+            'connect_timeout': 10
+        }
+    }
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False
     
