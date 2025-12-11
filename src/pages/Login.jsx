@@ -79,7 +79,7 @@ const Login = () => {
             Bem-vindo(a)!
           </h1>
           <p className="text-slate-400">
-            Faça login para acessar o painel.
+            Faça login para acessar o painel.!!
           </p>
         </div>
 
