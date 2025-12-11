@@ -4,6 +4,28 @@ from models.agendamento import Agendamento
 from utils.jwt_utils import token_required, decode_token
 from flask import request as flask_request
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+LOCAL_TZ = ZoneInfo("America/Fortaleza")
+
+
+def parse_datetime_local(dt_value):
+    """Converte string ISO ou datetime para datetime ingênuo no fuso de Fortaleza."""
+    if isinstance(dt_value, str):
+        # Suporta "Z" (UTC) ou offset explícito; se vier sem offset, assume já ser local
+        value = dt_value.replace('Z', '+00:00')
+        dt_obj = datetime.fromisoformat(value)
+    else:
+        dt_obj = dt_value
+
+    if dt_obj.tzinfo:
+        dt_local = dt_obj.astimezone(LOCAL_TZ)
+    else:
+        # Assume que já é horário local se vier sem tzinfo
+        dt_local = dt_obj.replace(tzinfo=LOCAL_TZ)
+
+    # Remover tzinfo antes de salvar no banco (coluna sem timezone), mas mantendo horário local correto
+    return dt_local.replace(tzinfo=None)
 
 bp = Blueprint('agendamentos', __name__)
 
@@ -40,7 +62,7 @@ def create_agendamento():
     agendamento = Agendamento(
         user_id=user_id,
         radio_id=data['radio_id'],
-        data_inicio=datetime.fromisoformat(data['data_inicio'].replace('Z', '+00:00')) if isinstance(data['data_inicio'], str) else data['data_inicio'],
+        data_inicio=parse_datetime_local(data['data_inicio']),
         duracao_minutos=data['duracao_minutos'],
         tipo_recorrencia=data.get('tipo_recorrencia', 'none'),
         status=data.get('status', 'agendado')
@@ -72,7 +94,7 @@ def update_agendamento(agendamento_id):
     if 'radio_id' in data:
         agendamento.radio_id = data['radio_id']
     if 'data_inicio' in data:
-        agendamento.data_inicio = datetime.fromisoformat(data['data_inicio'].replace('Z', '+00:00')) if isinstance(data['data_inicio'], str) else data['data_inicio']
+        agendamento.data_inicio = parse_datetime_local(data['data_inicio'])
     if 'duracao_minutos' in data:
         agendamento.duracao_minutos = data['duracao_minutos']
     if 'tipo_recorrencia' in data:
@@ -125,4 +147,3 @@ def toggle_status(agendamento_id):
     broadcast_update(f'user_{user_id}', 'agendamento_updated', agendamento.to_dict())
     
     return jsonify(agendamento.to_dict(include_radio=True)), 200
-

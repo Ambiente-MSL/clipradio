@@ -6,9 +6,11 @@ from app import db
 from models.agendamento import Agendamento
 from models.gravacao import Gravacao
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from services.recording_service import start_recording
 
-scheduler = BackgroundScheduler()
+LOCAL_TZ = ZoneInfo("America/Fortaleza")
+scheduler = BackgroundScheduler(timezone=LOCAL_TZ)
 
 def init_scheduler():
     """Inicializa o agendador"""
@@ -98,4 +100,3 @@ def execute_agendamento(agendamento_id):
         if agendamento.tipo_recorrencia == 'none':
             agendamento.status = 'concluido'
             db.session.commit()
-

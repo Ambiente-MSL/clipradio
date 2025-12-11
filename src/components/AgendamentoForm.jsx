@@ -125,7 +125,8 @@ const AgendamentoForm = ({ agendamentoIdParam }) => {
     }
 
     const duracao_minutos = minutosFim - minutosInicio;
-    const dataHoraInicioIso = new Date(`${formData.data_inicio}T${formData.hora_inicio}:00Z`).toISOString();
+    // Horário local Fortaleza (UTC-03) – enviamos o offset explícito para não deslocar
+    const dataHoraInicioIso = `${formData.data_inicio}T${formData.hora_inicio}:00-03:00`;
 
     const payload = {
       radio_id: formData.radio_id,
@@ -223,4 +224,3 @@ const AgendamentoForm = ({ agendamentoIdParam }) => {
 };
 
 export default AgendamentoForm;
-
