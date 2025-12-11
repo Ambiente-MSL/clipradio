@@ -27,10 +27,10 @@ function App() {
   return (
     <>
       <Helmet>
-        <title>Gestor de R?dios - IA Recorder</title>
+        <title>Gestor de Rádios - IA Recorder</title>
         <meta
           name="description"
-          content="Sistema avan?ado de gerenciamento de r?dios com grava??o autom?tica e agendamento inteligente"
+          content="Sistema avan?ado de gerenciamento de rádios com gravação automática e agendamento inteligente"
         />
       </Helmet>
 

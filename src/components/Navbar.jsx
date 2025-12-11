@@ -9,9 +9,9 @@ import Logo from '@/components/Logo';
 
 const navItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { name: 'R?dios', path: '/cadastro-radios', icon: Radio },
+  { name: 'Rádios', path: '/cadastro-radios', icon: Radio },
   { name: 'Agendamentos', path: '/agendamentos', icon: Calendar },
-  { name: 'Grava??es', path: '/gravacoes', icon: FileText },
+  { name: 'Gravações', path: '/gravacoes', icon: FileText },
   { name: 'Gravar Manual', path: '/gravador-manual', icon: Mic },
   { name: 'Tags', path: '/tags', icon: Tag },
   { name: 'Status', path: '/status', icon: Activity },
