@@ -1,106 +1,169 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import { Radio, Globe, Plus, Edit, Trash2, Star, StarOff, Loader, MapPin } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
-import { Button } from '@/components/ui/button';
-import apiClient from '@/lib/apiClient';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { motion } from 'framer-motion'
+import { Radio, Globe, Plus, Edit, Trash2, Star, StarOff, Loader, MapPin, Play, Pause } from 'lucide-react'
+import { useToast } from '@/components/ui/use-toast'
+import { Button } from '@/components/ui/button'
+import apiClient from '@/lib/apiClient'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 
 const CadastroRadios = () => {
-  const [radios, setRadios] = useState([]);
+  const [radios, setRadios] = useState([])
   const [formData, setFormData] = useState({
     nome: '',
     stream_url: '',
     cidade: '',
     estado: '',
     favorita: false,
-  });
-  const [editingId, setEditingId] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const { toast } = useToast();
+  })
+  const [editingId, setEditingId] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [currentRadioId, setCurrentRadioId] = useState(null)
+  const [isBuffering, setIsBuffering] = useState(false)
+  const audioRef = useRef(null)
+  const { toast } = useToast()
 
   const resetForm = useCallback(() => {
-    setFormData({ nome: '', stream_url: '', cidade: '', estado: '', favorita: false });
-    setEditingId(null);
-  }, []);
+    setFormData({ nome: '', stream_url: '', cidade: '', estado: '', favorita: false })
+    setEditingId(null)
+  }, [])
 
   const fetchRadios = useCallback(async () => {
-    setLoading(true);
+    setLoading(true)
     try {
-      const data = await apiClient.getRadios();
-      setRadios(data || []);
+      const data = await apiClient.getRadios()
+      setRadios(data || [])
     } catch (error) {
-      toast({ title: 'Erro ao buscar rádios', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao buscar rádios', description: error.message, variant: 'destructive' })
     }
-    setLoading(false);
-  }, [toast]);
+    setLoading(false)
+  }, [toast])
 
   useEffect(() => {
-    fetchRadios();
-  }, [fetchRadios]);
+    fetchRadios()
+  }, [fetchRadios])
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
 
     if (!formData.nome || !formData.stream_url || !formData.cidade || !formData.estado) {
-      toast({ title: 'Erro', description: 'Todos os campos são obrigatórios', variant: 'destructive' });
-      return;
+      toast({ title: 'Erro', description: 'Todos os campos são obrigatórios', variant: 'destructive' })
+      return
     }
 
-    setSaving(true);
+    setSaving(true)
     try {
       if (editingId) {
-        await apiClient.updateRadio(editingId, formData);
-        toast({ title: 'Sucesso!', description: 'Rádio atualizada com sucesso' });
+        await apiClient.updateRadio(editingId, formData)
+        toast({ title: 'Sucesso!', description: 'Rádio atualizada com sucesso' })
       } else {
-        await apiClient.createRadio(formData);
-        toast({ title: 'Sucesso!', description: 'Rádio cadastrada com sucesso' });
+        await apiClient.createRadio(formData)
+        toast({ title: 'Sucesso!', description: 'Rádio cadastrada com sucesso' })
       }
-      resetForm();
-      fetchRadios();
+      resetForm()
+      fetchRadios()
     } catch (error) {
-      toast({ title: 'Erro ao salvar rádio', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao salvar rádio', description: error.message, variant: 'destructive' })
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
-  };
+  }
 
   const handleEdit = (radio) => {
-    setEditingId(radio.id);
+    setEditingId(radio.id)
     setFormData({
       nome: radio.nome,
       stream_url: radio.stream_url,
       cidade: radio.cidade || '',
       estado: radio.estado || '',
       favorita: radio.favorita || false,
-    });
-  };
+    })
+  }
 
   const handleDelete = async (id) => {
     try {
-      await apiClient.deleteRadio(id);
-      toast({ title: 'Rádio removida', description: 'A rádio foi removida com sucesso' });
-      fetchRadios();
+      await apiClient.deleteRadio(id)
+      toast({ title: 'Rádio removida', description: 'A rádio foi removida com sucesso' })
+      fetchRadios()
     } catch (error) {
-      toast({ title: 'Erro ao remover rádio', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao remover rádio', description: error.message, variant: 'destructive' })
     }
-  };
+  }
 
   const toggleFavorite = async (radio) => {
     try {
-      const updated = { ...radio, favorita: !radio.favorita };
-      await apiClient.updateRadio(radio.id, { favorita: updated.favorita });
-      setRadios((prev) => prev.map((r) => (r.id === radio.id ? updated : r)));
+      const updated = { ...radio, favorita: !radio.favorita }
+      await apiClient.updateRadio(radio.id, { favorita: updated.favorita })
+      setRadios((prev) => prev.map((r) => (r.id === radio.id ? updated : r)))
       toast({
         title: updated.favorita ? 'Adicionada aos Favoritos' : 'Removida dos Favoritos',
         description: `${radio.nome} foi ${updated.favorita ? 'marcada como favorita' : 'desmarcada'}.`,
-      });
+      })
     } catch (error) {
-      toast({ title: 'Erro ao favoritar', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao favoritar', description: error.message, variant: 'destructive' })
     }
-  };
+  }
+
+  useEffect(() => {
+    audioRef.current = new Audio()
+    const audio = audioRef.current
+
+    const handlePlay = () => setIsBuffering(false)
+    const handleWaiting = () => setIsBuffering(true)
+    const handleError = () => {
+      setIsBuffering(false)
+      toast({ title: 'Erro ao reproduzir', description: 'Não foi possível tocar o stream da rádio.', variant: 'destructive' })
+      setCurrentRadioId(null)
+    }
+
+    audio.addEventListener('play', handlePlay)
+    audio.addEventListener('waiting', handleWaiting)
+    audio.addEventListener('canplay', handlePlay)
+    audio.addEventListener('error', handleError)
+
+    return () => {
+      audio.pause()
+      audio.removeEventListener('play', handlePlay)
+      audio.removeEventListener('waiting', handleWaiting)
+      audio.removeEventListener('canplay', handlePlay)
+      audio.removeEventListener('error', handleError)
+    }
+  }, [toast])
+
+  const handlePlayPause = useCallback(
+    async (radio) => {
+      const audio = audioRef.current
+      if (!audio) return
+
+      if (currentRadioId === radio.id && !audio.paused) {
+        audio.pause()
+        setCurrentRadioId(null)
+        setIsBuffering(false)
+        return
+      }
+
+      try {
+        setIsBuffering(true)
+        audio.pause()
+        audio.src = radio.stream_url
+        audio.load()
+        await audio.play()
+        setCurrentRadioId(radio.id)
+      } catch (err) {
+        setIsBuffering(false)
+        toast({
+          title: 'Erro ao reproduzir',
+          description: err?.message || 'Verifique se a URL do stream está acessível.',
+          variant: 'destructive',
+        })
+        setCurrentRadioId(null)
+      }
+    },
+    [currentRadioId, toast]
+  )
+
+  const isPlaying = (id) => currentRadioId === id && audioRef.current && !audioRef.current.paused
 
   return (
     <div className="min-h-screen p-4 md:p-6">
@@ -215,22 +278,38 @@ const CadastroRadios = () => {
                         <div className="flex items-center justify-between">
                           <div>
                             <h3 className="text-lg font-semibold text-white">{radio.nome}</h3>
-                            <p className="text-sm text-slate-400">{radio.stream_url}</p>
+                            <p className="text-sm text-slate-400 break-all">{radio.stream_url}</p>
                           </div>
                           <Button variant="ghost" size="icon" onClick={() => toggleFavorite(radio)} className="text-yellow-400">
                             {radio.favorita ? <Star className="w-5 h-5" /> : <StarOff className="w-5 h-5" />}
                           </Button>
                         </div>
                         <div className="flex items-center gap-4 text-sm text-slate-400">
-                          <span className="flex items-center gap-1"><Globe className="w-4 h-4" />{radio.cidade || ''}</span>
-                          <span className="flex items-center gap-1"><MapPin className="w-4 h-4" />{radio.estado || ''}</span>
+                          <span className="flex items-center gap-1"><Globe className="w-4 h-4" />{radio.cidade || '--'}</span>
+                          <span className="flex items-center gap-1"><MapPin className="w-4 h-4" />{radio.estado || '--'}</span>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2 items-center">
                           <Button size="sm" variant="outline" onClick={() => handleEdit(radio)}>
                             <Edit className="w-4 h-4 mr-2" /> Editar
                           </Button>
                           <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(radio.id)}>
                             <Trash2 className="w-4 h-4 mr-2" /> Excluir
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handlePlayPause(radio)}
+                            className="ml-auto flex items-center gap-2"
+                          >
+                            {isPlaying(radio.id) ? (
+                              <>
+                                <Pause className="w-4 h-4" /> Pausar
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-4 h-4" /> {isBuffering && currentRadioId === radio.id ? 'Carregando...' : 'Ouvir'}
+                              </>
+                            )}
                           </Button>
                         </div>
                       </div>
@@ -243,7 +322,7 @@ const CadastroRadios = () => {
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default CadastroRadios;
+export default CadastroRadios
