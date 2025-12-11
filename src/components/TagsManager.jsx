@@ -51,7 +51,7 @@ const TagForm = ({ tag, onSave, onCancel, loading }) => {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <Label htmlFor="tag-name" className="text-slate-300">Nome da Tag</Label>
-        <Input id="tag-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Notícia Urgente" className="mt-1" />
+        <Input id="tag-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: NotÃ­cia Urgente" className="mt-1" />
       </div>
       <div>
         <Label className="text-slate-300">Cor</Label>
@@ -111,7 +111,7 @@ const TagsManager = ({ onTagsUpdated }) => {
 
   const handleSaveTag = async (tagData) => {
     if (!tagData.nome.trim()) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'O nome da tag não pode ser vazio.' });
+      toast({ variant: 'destructive', title: 'Erro', description: 'O nome da tag nÃ£o pode ser vazio.' });
       return;
     }
     setIsSubmitting(true);
@@ -137,7 +137,7 @@ const TagsManager = ({ onTagsUpdated }) => {
     if (!window.confirm(`Tem certeza que deseja excluir a tag "${tag.nome}"?`)) return;
     try {
       await apiClient.deleteTag(tag.id);
-      toast({ title: 'Tag excluída com sucesso!', className: 'bg-green-600 text-white' });
+      toast({ title: 'Tag excluÃ­da com sucesso!', className: 'bg-green-600 text-white' });
       await fetchTags();
       if (onTagsUpdated) onTagsUpdated();
     } catch (error) {
@@ -186,7 +186,7 @@ const TagsManager = ({ onTagsUpdated }) => {
             <div className="text-center py-12 text-slate-500">
               <TagIcon className="w-12 h-12 mx-auto mb-4" />
               <p className="font-semibold">Nenhuma tag encontrada.</p>
-              <p className="text-sm">Clique em "Nova Tag" para começar a organizar.</p>
+              <p className="text-sm">Clique em "Nova Tag" para comeÃ§ar a organizar.</p>
             </div>
           )}
         </div>
@@ -195,4 +195,4 @@ const TagsManager = ({ onTagsUpdated }) => {
   );
 };
 
-export default TagsManager;
+export default TagsManager;

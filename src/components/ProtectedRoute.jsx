@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { Navigate, useLocation } from 'react-router-dom';
@@ -16,7 +17,7 @@ const ProtectedRoute = ({ children }) => {
   }
 
   if (!user) {
-    // Sem usuário autenticado: redireciona para o login
+    // Sem usu?rio autenticado: redireciona para o login
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

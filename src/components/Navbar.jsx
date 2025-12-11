@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -8,9 +9,9 @@ import Logo from '@/components/Logo';
 
 const navItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { name: 'Rádios', path: '/cadastro-radios', icon: Radio },
+  { name: 'R?dios', path: '/cadastro-radios', icon: Radio },
   { name: 'Agendamentos', path: '/agendamentos', icon: Calendar },
-  { name: 'Gravações', path: '/gravacoes', icon: FileText },
+  { name: 'Grava??es', path: '/gravacoes', icon: FileText },
   { name: 'Gravar Manual', path: '/gravador-manual', icon: Mic },
   { name: 'Tags', path: '/tags', icon: Tag },
   { name: 'Status', path: '/status', icon: Activity },

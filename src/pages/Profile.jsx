@@ -34,7 +34,7 @@ const Profile = () => {
           <User className="w-8 h-8 mr-3 text-cyan-400" />
           <div>
             <h1 className="text-3xl md:text-4xl font-bold">Meu Perfil</h1>
-            <p className="text-md text-slate-400">Informações da sua conta.</p>
+            <p className="text-md text-slate-400">InformaÃ§Ãµes da sua conta.</p>
           </div>
         </motion.div>
 
@@ -49,13 +49,13 @@ const Profile = () => {
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <CardTitle className="text-2xl">{user?.nome || 'Usuário'}</CardTitle>
+                  <CardTitle className="text-2xl">{user?.nome || 'UsuÃ¡rio'}</CardTitle>
                   <CardDescription className="text-slate-400">{user?.email}</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-slate-300">Para alterar suas informações de conta, entre em contato com o administrador.</p>
+              <p className="text-slate-300">Para alterar suas informaÃ§Ãµes de conta, entre em contato com o administrador.</p>
             </CardContent>
           </Card>
         </motion.div>
@@ -64,4 +64,4 @@ const Profile = () => {
   );
 };
 
-export default Profile;
+export default Profile;

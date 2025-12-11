@@ -32,7 +32,7 @@ const CadastroRadios = () => {
       const data = await apiClient.getRadios();
       setRadios(data || []);
     } catch (error) {
-      toast({ title: 'Erro ao buscar rádios', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao buscar rÃ¡dios', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   }, [toast]);
@@ -45,7 +45,7 @@ const CadastroRadios = () => {
     e.preventDefault();
 
     if (!formData.nome || !formData.stream_url || !formData.cidade || !formData.estado) {
-      toast({ title: 'Erro', description: 'Todos os campos são obrigatórios', variant: 'destructive' });
+      toast({ title: 'Erro', description: 'Todos os campos sÃ£o obrigatÃ³rios', variant: 'destructive' });
       return;
     }
 
@@ -53,15 +53,15 @@ const CadastroRadios = () => {
     try {
       if (editingId) {
         await apiClient.updateRadio(editingId, formData);
-        toast({ title: 'Sucesso!', description: 'Rádio atualizada com sucesso' });
+        toast({ title: 'Sucesso!', description: 'RÃ¡dio atualizada com sucesso' });
       } else {
         await apiClient.createRadio(formData);
-        toast({ title: 'Sucesso!', description: 'Rádio cadastrada com sucesso' });
+        toast({ title: 'Sucesso!', description: 'RÃ¡dio cadastrada com sucesso' });
       }
       resetForm();
       fetchRadios();
     } catch (error) {
-      toast({ title: 'Erro ao salvar rádio', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao salvar rÃ¡dio', description: error.message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -81,10 +81,10 @@ const CadastroRadios = () => {
   const handleDelete = async (id) => {
     try {
       await apiClient.deleteRadio(id);
-      toast({ title: 'Rádio removida', description: 'A rádio foi removida com sucesso' });
+      toast({ title: 'RÃ¡dio removida', description: 'A rÃ¡dio foi removida com sucesso' });
       fetchRadios();
     } catch (error) {
-      toast({ title: 'Erro ao remover rádio', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao remover rÃ¡dio', description: error.message, variant: 'destructive' });
     }
   };
 
@@ -106,8 +106,8 @@ const CadastroRadios = () => {
     <div className="min-h-screen p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold gradient-text mb-2">Gerenciador de Rádios</h1>
-          <p className="text-slate-400 text-lg">Adicione, edite e organize suas estações de rádio.</p>
+          <h1 className="text-3xl md:text-4xl font-bold gradient-text mb-2">Gerenciador de RÃ¡dios</h1>
+          <p className="text-slate-400 text-lg">Adicione, edite e organize suas estaÃ§Ãµes de rÃ¡dio.</p>
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -116,17 +116,17 @@ const CadastroRadios = () => {
               <CardHeader>
                 <CardTitle className="flex items-center text-white">
                   <Plus className="w-6 h-6 mr-3 text-cyan-400" />
-                  {editingId ? 'Editar Rádio' : 'Nova Rádio'}
+                  {editingId ? 'Editar RÃ¡dio' : 'Nova RÃ¡dio'}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <label className="block text-sm text-slate-400 mb-1">Nome da Rádio</label>
+                    <label className="block text-sm text-slate-400 mb-1">Nome da RÃ¡dio</label>
                     <Input
                       value={formData.nome}
                       onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                      placeholder="Ex: Rádio Rock"
+                      placeholder="Ex: RÃ¡dio Rock"
                     />
                   </div>
                   <div>
@@ -144,7 +144,7 @@ const CadastroRadios = () => {
                         <Input
                           value={formData.cidade}
                           onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
-                          placeholder="São Paulo"
+                          placeholder="SÃ£o Paulo"
                         />
                         <Globe className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                       </div>
@@ -177,7 +177,7 @@ const CadastroRadios = () => {
 
                   <div className="flex gap-3">
                     <Button type="submit" className="flex-1" disabled={saving}>
-                      {saving ? 'Salvando...' : editingId ? 'Salvar alterações' : 'Adicionar Rádio'}
+                      {saving ? 'Salvando...' : editingId ? 'Salvar alteraÃ§Ãµes' : 'Adicionar RÃ¡dio'}
                     </Button>
                     {editingId && (
                       <Button type="button" variant="outline" onClick={resetForm}>
@@ -195,7 +195,7 @@ const CadastroRadios = () => {
               <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <CardTitle className="flex items-center text-white">
                   <Radio className="w-6 h-6 mr-3 text-cyan-400" />
-                  Rádios Cadastradas
+                  RÃ¡dios Cadastradas
                 </CardTitle>
                 <span className="text-sm text-slate-400">Total: {radios.length}</span>
               </CardHeader>
@@ -206,7 +206,7 @@ const CadastroRadios = () => {
                   </div>
                 ) : radios.length === 0 ? (
                   <div className="text-center py-12 text-slate-400">
-                    Nenhuma rádio cadastrada ainda.
+                    Nenhuma rÃ¡dio cadastrada ainda.
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -222,8 +222,8 @@ const CadastroRadios = () => {
                           </Button>
                         </div>
                         <div className="flex items-center gap-4 text-sm text-slate-400">
-                          <span className="flex items-center gap-1"><Globe className="w-4 h-4" />{radio.cidade || '—'}</span>
-                          <span className="flex items-center gap-1"><MapPin className="w-4 h-4" />{radio.estado || '—'}</span>
+                          <span className="flex items-center gap-1"><Globe className="w-4 h-4" />{radio.cidade || 'Â—'}</span>
+                          <span className="flex items-center gap-1"><MapPin className="w-4 h-4" />{radio.estado || 'Â—'}</span>
                         </div>
                         <div className="flex gap-2">
                           <Button size="sm" variant="outline" onClick={() => handleEdit(radio)}>
@@ -246,4 +246,4 @@ const CadastroRadios = () => {
   );
 };
 
-export default CadastroRadios;
+export default CadastroRadios;

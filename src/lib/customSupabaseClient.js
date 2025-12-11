@@ -1,11 +1,11 @@
 // Supabase client removido: este stub evita chamadas indevidas.
 export const supabase = {
   from() {
-    throw new Error('Supabase n„o est· mais disponÌvel neste projeto. Use apiClient.');
+    throw new Error('Supabase n√£o est√° mais dispon√≠vel neste projeto. Use apiClient.');
   },
   functions: {
     async invoke() {
-      return { data: null, error: new Error('Supabase Functions n„o est„o habilitadas. Use a API do backend.') };
+      return { data: null, error: new Error('Supabase Functions n√£o est√£o habilitadas. Use a API do backend.') };
     },
   },
   storage: {
@@ -27,4 +27,4 @@ export const supabase = {
     };
   },
   removeChannel() {},
-};
+};

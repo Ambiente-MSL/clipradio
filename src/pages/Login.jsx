@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
@@ -10,7 +11,7 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const { signIn, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -26,40 +27,38 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
       toast({
-        variant: "destructive",
-        title: "Campos obrigatórios",
-        description: "Por favor, preencha email e senha.",
+        variant: 'destructive',
+        title: 'Campos obrigat?rios',
+        description: 'Por favor, preencha email e senha.',
       });
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+
     try {
       const { error } = await signIn(email, password);
-      
+
       if (!error) {
         toast({
-          title: `Sucesso!`,
-          description: "Login realizado com sucesso! Bem-vindo(a) de volta!",
+          title: 'Sucesso!',
+          description: 'Login realizado com sucesso! Bem-vindo(a) de volta!',
         });
-        // Pequeno delay para garantir que a sessão foi atualizada
         setTimeout(() => {
           navigate(from, { replace: true });
         }, 100);
       } else {
-        // O erro já foi exibido pelo signIn, apenas resetamos o estado
         console.error('Erro no login:', error);
       }
     } catch (err) {
       console.error('Erro inesperado:', err);
       toast({
-        variant: "destructive",
-        title: "Erro inesperado",
-        description: "Ocorreu um erro inesperado. Tente novamente.",
+        variant: 'destructive',
+        title: 'Erro inesperado',
+        description: 'Ocorreu um erro inesperado. Tente novamente.',
       });
     } finally {
       setIsSubmitting(false);
@@ -79,7 +78,7 @@ const Login = () => {
             Bem-vindo(a)!
           </h1>
           <p className="text-slate-400">
-            Faça login para acessar o painel.!!
+            Fa?a login para acessar o painel.
           </p>
         </div>
 
@@ -108,7 +107,7 @@ const Login = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="input"
-              placeholder="••••••••"
+              placeholder="******** (m?nimo 6 caracteres)"
               required
             />
           </div>
@@ -122,16 +121,16 @@ const Login = () => {
             )}
           </Button>
         </form>
-        
+
         <div className="mt-6 text-center">
           <p className="text-slate-400">
-            Não tem uma conta?
+            N?o tem uma conta?
             <Link to="/cadastro-usuario">
-                <button
+              <button
                 className="font-semibold text-cyan-400 hover:text-cyan-300 ml-2 focus:outline-none"
-                >
+              >
                 Cadastre-se
-                </button>
+              </button>
             </Link>
           </p>
         </div>

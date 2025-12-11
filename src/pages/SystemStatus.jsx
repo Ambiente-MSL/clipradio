@@ -42,8 +42,8 @@ const SystemStatus = () => {
       setStatus("offline");
       setDetails(error.message);
       toast({
-        title: "Erro na Verificação",
-        description: "Não foi possível obter o status do serviço.",
+        title: "Erro na VerificaÃ§Ã£o",
+        description: "NÃ£o foi possÃ­vel obter o status do serviÃ§o.",
         variant: "destructive",
       });
     }
@@ -58,7 +58,7 @@ const SystemStatus = () => {
       case "online":
         return "Todos os sistemas operacionais.";
       case "offline":
-        return "Serviço de gravação indisponível.";
+        return "ServiÃ§o de gravaÃ§Ã£o indisponÃ­vel.";
       default:
         return "Verificando...";
     }
@@ -68,7 +68,7 @@ const SystemStatus = () => {
     <>
       <Helmet>
         <title>Status do Sistema - IA Recorder</title>
-        <meta name="description" content="Verifique o status dos serviços do IA Recorder." />
+        <meta name="description" content="Verifique o status dos serviÃ§os do IA Recorder." />
       </Helmet>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -82,7 +82,7 @@ const SystemStatus = () => {
         <Card className="w-full max-w-md mx-auto shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              <span>Serviço de Gravação</span>
+              <span>ServiÃ§o de GravaÃ§Ã£o</span>
               <StatusIndicator status={status} />
             </CardTitle>
           </CardHeader>
@@ -93,7 +93,7 @@ const SystemStatus = () => {
             </div>
             {details && <p className="text-sm text-gray-600 dark:text-gray-300">{details}</p>}
             <div className="text-sm text-gray-500 dark:text-gray-400">
-              Última verificação: {lastChecked ? lastChecked.toLocaleString() : "-"}
+              Ãšltima verificaÃ§Ã£o: {lastChecked ? lastChecked.toLocaleString() : "-"}
             </div>
             <Button onClick={checkStatus} variant="outline" className="w-full">
               Recarregar status
@@ -105,4 +105,4 @@ const SystemStatus = () => {
   );
 };
 
-export default SystemStatus;
+export default SystemStatus;

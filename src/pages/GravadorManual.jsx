@@ -27,7 +27,7 @@ export default function GravadorManual() {
         const data = await apiClient.getRadios();
         setRadios(data || []);
       } catch (error) {
-        toast({ variant: 'destructive', title: 'Erro ao buscar r·dios', description: error.message });
+        toast({ variant: 'destructive', title: 'Erro ao buscar r√°dios', description: error.message });
       } finally {
         setIsFetchingRadios(false);
       }
@@ -42,8 +42,8 @@ export default function GravadorManual() {
     if (!selectedRadio || !duration || duration < 1 || duration > 240) {
       toast({
         variant: "destructive",
-        title: "Campos obrigatÛrios",
-        description: "Selecione uma r·dio e defina uma duraÁ„o v·lida (1-240 minutos).",
+        title: "Campos obrigat√≥rios",
+        description: "Selecione uma r√°dio e defina uma dura√ß√£o v√°lida (1-240 minutos).",
       });
       return;
     }
@@ -60,8 +60,8 @@ export default function GravadorManual() {
       await apiClient.startRecording(gravacao.id);
 
       toast({
-        title: "GravaÁ„o iniciada!",
-        description: "Sua gravaÁ„o manual comeÁou em segundo plano.",
+        title: "Grava√ß√£o iniciada!",
+        description: "Sua grava√ß√£o manual come√ßou em segundo plano.",
       });
       setSelectedRadio('');
       setDuration(60);
@@ -69,7 +69,7 @@ export default function GravadorManual() {
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "Erro ao iniciar gravaÁ„o",
+        title: "Erro ao iniciar grava√ß√£o",
         description: error.message || "Ocorreu uma falha desconhecida.",
       });
     } finally {
@@ -80,8 +80,8 @@ export default function GravadorManual() {
   return (
     <>
       <Helmet>
-        <title>GravaÁ„o Manual - Gestor de R·dios</title>
-        <meta name="description" content="Inicie uma gravaÁ„o de r·dio manualmente a qualquer momento." />
+        <title>Grava√ß√£o Manual - Gestor de R√°dios</title>
+        <meta name="description" content="Inicie uma grava√ß√£o de r√°dio manualmente a qualquer momento." />
       </Helmet>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -90,7 +90,7 @@ export default function GravadorManual() {
         className="container mx-auto max-w-4xl px-4 py-8"
       >
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-4xl font-bold tracking-tight text-slate-50">GravaÁ„o Manual</h1>
+          <h1 className="text-4xl font-bold tracking-tight text-slate-50">Grava√ß√£o Manual</h1>
         </div>
 
         <Card className="bg-slate-900/70 border-slate-800 backdrop-blur-sm">
@@ -98,9 +98,9 @@ export default function GravadorManual() {
             <div className="flex items-center gap-4">
               <Radio className="w-8 h-8 text-cyan-400" />
               <div>
-                <CardTitle className="text-2xl font-semibold text-slate-50">Iniciar Nova GravaÁ„o</CardTitle>
+                <CardTitle className="text-2xl font-semibold text-slate-50">Iniciar Nova Grava√ß√£o</CardTitle>
                 <CardDescription className="text-slate-400">
-                  Selecione uma r·dio e a duraÁ„o para comeÁar a gravar imediatamente.
+                  Selecione uma r√°dio e a dura√ß√£o para come√ßar a gravar imediatamente.
                 </CardDescription>
               </div>
             </div>
@@ -108,14 +108,14 @@ export default function GravadorManual() {
           <CardContent>
             <div className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="radio-select" className="text-slate-300">R·dio</Label>
+                <Label htmlFor="radio-select" className="text-slate-300">R√°dio</Label>
                 <Select
                   value={selectedRadio}
                   onValueChange={setSelectedRadio}
                   disabled={isFetchingRadios || isLoading}
                 >
                   <SelectTrigger id="radio-select" className="w-full bg-slate-800 border-slate-700 text-slate-50">
-                    <SelectValue placeholder={isFetchingRadios ? "Carregando r·dios..." : "Selecione uma r·dio"} />
+                    <SelectValue placeholder={isFetchingRadios ? "Carregando r√°dios..." : "Selecione uma r√°dio"} />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-900 border-slate-800 text-slate-50">
                     {radios.map((radio) => (
@@ -127,7 +127,7 @@ export default function GravadorManual() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="duration" className="text-slate-300">DuraÁ„o da GravaÁ„o (em minutos)</Label>
+                <Label htmlFor="duration" className="text-slate-300">Dura√ß√£o da Grava√ß√£o (em minutos)</Label>
                 <Input
                   id="duration"
                   type="number"
@@ -158,15 +158,15 @@ export default function GravadorManual() {
                 ) : (
                   <div className="flex items-center justify-center">
                     <Clock className="mr-2 h-5 w-5" />
-                    Iniciar GravaÁ„o
+                    Iniciar Grava√ß√£o
                   </div>
                 )}
               </Button>
               <div className="p-4 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-300 text-sm flex items-start gap-3">
                 <Info className="w-4 h-4 text-cyan-400 mt-1" />
                 <div>
-                  <p>As gravaÁıes s„o executadas no servidor backend. VocÍ pode acompanhar o status na lista de gravaÁıes.</p>
-                  <p className="text-slate-400 mt-1">Certifique-se de que a URL do stream est· ativa antes de iniciar.</p>
+                  <p>As grava√ß√µes s√£o executadas no servidor backend. Voc√™ pode acompanhar o status na lista de grava√ß√µes.</p>
+                  <p className="text-slate-400 mt-1">Certifique-se de que a URL do stream est√° ativa antes de iniciar.</p>
                 </div>
               </div>
             </div>
@@ -175,4 +175,4 @@ export default function GravadorManual() {
       </motion.div>
     </>
   );
-}
+}

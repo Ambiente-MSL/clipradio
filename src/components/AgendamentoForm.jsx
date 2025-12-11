@@ -30,11 +30,11 @@ const AgendamentoForm = ({ agendamentoIdParam }) => {
 
   const DIAS_SEMANA_OPTIONS = [
     { id: 1, label: 'Segunda-feira' },
-    { id: 2, label: 'Terça-feira' },
+    { id: 2, label: 'TerÃ§a-feira' },
     { id: 3, label: 'Quarta-feira' },
     { id: 4, label: 'Quinta-feira' },
     { id: 5, label: 'Sexta-feira' },
-    { id: 6, label: 'Sábado' },
+    { id: 6, label: 'SÃ¡bado' },
     { id: 0, label: 'Domingo' },
   ];
 
@@ -66,7 +66,7 @@ const AgendamentoForm = ({ agendamentoIdParam }) => {
             dias_da_semana: agendamentoData.dias_semana || [],
           });
         } else {
-          toast({ title: "Agendamento não encontrado", description: "Não foi possível carregar os dados para edição.", variant: "destructive" });
+          toast({ title: "Agendamento nÃ£o encontrado", description: "NÃ£o foi possÃ­vel carregar os dados para ediÃ§Ã£o.", variant: "destructive" });
           navigate('/agendamentos');
         }
       }
@@ -102,11 +102,11 @@ const AgendamentoForm = ({ agendamentoIdParam }) => {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!formData.radio_id) {
-      toast({ variant: "destructive", title: "Erro de Validação", description: "Por favor, selecione uma rádio." });
+      toast({ variant: "destructive", title: "Erro de ValidaÃ§Ã£o", description: "Por favor, selecione uma rÃ¡dio." });
       return;
     }
     if (formData.tipo_recorrencia === 'weekly' && formData.dias_da_semana.length === 0) {
-      toast({ variant: "destructive", title: "Erro de Validação", description: "Selecione pelo menos um dia da semana." });
+      toast({ variant: "destructive", title: "Erro de ValidaÃ§Ã£o", description: "Selecione pelo menos um dia da semana." });
       return;
     }
     
@@ -118,8 +118,8 @@ const AgendamentoForm = ({ agendamentoIdParam }) => {
     if (minutosInicio >= minutosFim) {
       toast({ 
         variant: "destructive", 
-        title: "Erro de Validação", 
-        description: "O horário de início deve ser anterior ao horário de fim." 
+        title: "Erro de ValidaÃ§Ã£o", 
+        description: "O horÃ¡rio de inÃ­cio deve ser anterior ao horÃ¡rio de fim." 
       });
       return;
     }
@@ -160,9 +160,9 @@ const AgendamentoForm = ({ agendamentoIdParam }) => {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-            <Label htmlFor="radio_id" className="flex items-center gap-2 mb-1"><RadioIcon className="w-4 h-4" /> Rádio</Label>
+            <Label htmlFor="radio_id" className="flex items-center gap-2 mb-1"><RadioIcon className="w-4 h-4" /> RÃ¡dio</Label>
             <Select name="radio_id" value={formData.radio_id} onValueChange={v => handleSelectChange('radio_id', v)} disabled={loading || radios.length === 0}>
-                <SelectTrigger id="radio_id"><SelectValue placeholder="Selecione uma rádio..." /></SelectTrigger>
+                <SelectTrigger id="radio_id"><SelectValue placeholder="Selecione uma rÃ¡dio..." /></SelectTrigger>
                 <SelectContent>
                     {radios.map(radio => (
                         <SelectItem key={radio.id} value={radio.id}>{radio.nome}</SelectItem>
@@ -173,7 +173,7 @@ const AgendamentoForm = ({ agendamentoIdParam }) => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-                <Label htmlFor="hora_inicio" className="flex items-center gap-2"><Clock className="w-4 h-4" /> Hora de Início</Label>
+                <Label htmlFor="hora_inicio" className="flex items-center gap-2"><Clock className="w-4 h-4" /> Hora de InÃ­cio</Label>
                 <Input type="time" id="hora_inicio" name="hora_inicio" value={formData.hora_inicio} onChange={handleInputChange} className="input" required />
             </div>
             <div>
@@ -183,11 +183,11 @@ const AgendamentoForm = ({ agendamentoIdParam }) => {
         </div>
         
         <div>
-            <Label className="flex items-center gap-2 mb-1"><Repeat className="w-4 h-4" /> Recorrência</Label>
+            <Label className="flex items-center gap-2 mb-1"><Repeat className="w-4 h-4" /> RecorrÃªncia</Label>
             <Select name="tipo_recorrencia" value={formData.tipo_recorrencia} onValueChange={v => handleSelectChange('tipo_recorrencia', v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="none">Gravação Única</SelectItem>
+                    <SelectItem value="none">GravaÃ§Ã£o Ãšnica</SelectItem>
                     <SelectItem value="daily">Diariamente</SelectItem>
                     <SelectItem value="weekly">Semanalmente</SelectItem>
                 </SelectContent>
@@ -196,7 +196,7 @@ const AgendamentoForm = ({ agendamentoIdParam }) => {
 
         {formData.tipo_recorrencia === 'none' && (
             <div>
-                <Label htmlFor="data_inicio">Data da Gravação</Label>
+                <Label htmlFor="data_inicio">Data da GravaÃ§Ã£o</Label>
                 <Input type="date" id="data_inicio" name="data_inicio" value={formData.data_inicio} onChange={handleInputChange} className="input" required />
             </div>
         )}
@@ -222,4 +222,4 @@ const AgendamentoForm = ({ agendamentoIdParam }) => {
   );
 };
 
-export default AgendamentoForm;
+export default AgendamentoForm;

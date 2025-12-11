@@ -65,7 +65,7 @@ const Agendamentos = () => {
   const getStatusInfo = (status) => {
     switch (status) {
       case 'agendado': return { text: 'Agendado', className: 'status-active', icon: <Clock className="w-3 h-3 mr-1" /> };
-      case 'concluido': return { text: 'Concluído', className: 'status-completed', icon: <CheckCircle className="w-3 h-3 mr-1" /> };
+      case 'concluido': return { text: 'ConcluÃ­do', className: 'status-completed', icon: <CheckCircle className="w-3 h-3 mr-1" /> };
       case 'em_execucao': return { text: 'Gravando', className: 'status-recording', icon: <Loader className="w-3 h-3 mr-1 animate-spin" /> };
       case 'erro': return { text: 'Erro', className: 'status-error', icon: <AlertCircle className="w-3 h-3 mr-1" /> };
       case 'inativo': return { text: 'Inativo', className: 'status-inactive', icon: <PowerOff className="w-3 h-3 mr-1" /> };
@@ -75,13 +75,13 @@ const Agendamentos = () => {
 
   const formatRecorrencia = (agendamento) => {
     if (agendamento.tipo_recorrencia === 'none') {
-      if (!agendamento.data_inicio) return 'Único';
+      if (!agendamento.data_inicio) return 'Ãšnico';
       const [year, month, day] = agendamento.data_inicio.split('-');
       const date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
       const dataFormatada = new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(date);
-      return `Único - ${dataFormatada}`;
+      return `Ãšnico - ${dataFormatada}`;
     }
-    const dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'SÃ¡b'];
     let str = '';
     switch (agendamento.tipo_recorrencia) {
       case 'daily': str = 'Diariamente'; break;
@@ -109,7 +109,7 @@ const Agendamentos = () => {
       }
     } catch (timezoneError) {
       if (process.env.NODE_ENV === 'development') {
-        console.warn('Fallback para horário devido a erro de timezone:', timezoneError);
+        console.warn('Fallback para horÃ¡rio devido a erro de timezone:', timezoneError);
       }
     }
 
@@ -128,14 +128,14 @@ const Agendamentos = () => {
     <>
       <Helmet>
         <title>Agendamentos - IA Recorder</title>
-        <meta name="description" content="Gerencie e configure gravações automáticas para suas rádios." />
+        <meta name="description" content="Gerencie e configure gravaÃ§Ãµes automÃ¡ticas para suas rÃ¡dios." />
       </Helmet>
       <div className="min-h-screen p-6">
         <div className="max-w-6xl mx-auto">
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8 flex justify-between items-center">
             <div>
               <h1 className="text-4xl font-bold gradient-text mb-2">Agendamentos</h1>
-              <p className="text-slate-400 text-lg">Configure gravações recorrentes para suas rádios</p>
+              <p className="text-slate-400 text-lg">Configure gravaÃ§Ãµes recorrentes para suas rÃ¡dios</p>
             </div>
             <Button onClick={handleAddNew} className="btn btn-primary">
               <Plus className="w-5 h-5 mr-2"/>
@@ -152,7 +152,7 @@ const Agendamentos = () => {
               {loading ? (
                 <div className="flex justify-center items-center h-48"><Loader className="w-8 h-8 animate-spin text-cyan-400" /></div>
               ) : agendamentos.length === 0 ? (
-                <div className="text-center py-12"><Calendar className="w-16 h-16 text-slate-600 mx-auto mb-4" /><p className="text-slate-400 text-lg">Nenhum agendamento criado</p><p className="text-slate-500">Clique em "Novo Agendamento" para começar.</p></div>
+                <div className="text-center py-12"><Calendar className="w-16 h-16 text-slate-600 mx-auto mb-4" /><p className="text-slate-400 text-lg">Nenhum agendamento criado</p><p className="text-slate-500">Clique em "Novo Agendamento" para comeÃ§ar.</p></div>
               ) : (
                 <div className="space-y-4 max-h-[60vh] overflow-y-auto">
                   {agendamentos.map((agendamento, index) => {
@@ -162,7 +162,7 @@ const Agendamentos = () => {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
-                              <h3 className="font-semibold text-white">{agendamento.radios?.nome || 'Rádio desconhecida'}</h3>
+                              <h3 className="font-semibold text-white">{agendamento.radios?.nome || 'RÃ¡dio desconhecida'}</h3>
                             <span className={`flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusInfo.className}`}>
                               {statusInfo.icon}
                               {statusInfo.text}
@@ -184,9 +184,9 @@ const Agendamentos = () => {
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                <AlertDialogTitle>VocÃª tem certeza?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Esta ação é irreversível e excluirá o agendamento.
+                                  Esta aÃ§Ã£o Ã© irreversÃ­vel e excluirÃ¡ o agendamento.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -212,4 +212,4 @@ const Agendamentos = () => {
   );
 };
 
-export default Agendamentos;
+export default Agendamentos;

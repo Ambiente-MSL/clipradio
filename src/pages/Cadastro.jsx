@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useNavigate, Link } from 'react-router-dom';
@@ -10,7 +11,7 @@ const Cadastro = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const { signUp, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -24,24 +25,22 @@ const Cadastro = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     const nome = (email.split('@')[0] || 'Usuario').slice(0, 255);
 
     const { error } = await signUp(email, password, nome);
 
     if (!error) {
       toast({
-          title: "Cadastro realizado!",
-          description: "Conta criada com sucesso. Você já pode fazer login.",
-          duration: 6000
+        title: 'Cadastro realizado!',
+        description: 'Conta criada com sucesso. Voc? j? pode fazer login.',
+        duration: 6000,
       });
       navigate('/login');
     }
-    
+
     setIsSubmitting(false);
   };
-
-  // Fluxo direto (sem etapa de confirmação de e-mail)
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -56,7 +55,7 @@ const Cadastro = () => {
             Criar Nova Conta
           </h1>
           <p className="text-slate-400">
-            Preencha os dados para começar a gravar.
+            Preencha os dados para come?ar a gravar.
           </p>
         </div>
 
@@ -85,7 +84,7 @@ const Cadastro = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="input"
-              placeholder="•••••••• (mínimo 6 caracteres)"
+              placeholder="******** (m?nimo 6 caracteres)"
               required
             />
           </div>
@@ -99,13 +98,13 @@ const Cadastro = () => {
             )}
           </Button>
         </form>
-        
+
         <div className="mt-6 text-center">
           <p className="text-slate-400">
-            Já tem uma conta?
+            J? tem uma conta?
             <Link to="/login">
               <button className="font-semibold text-cyan-400 hover:text-cyan-300 ml-2 focus:outline-none">
-                Faça login
+                Fa?a login
               </button>
             </Link>
           </p>

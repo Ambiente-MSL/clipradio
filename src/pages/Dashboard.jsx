@@ -32,7 +32,7 @@ const Dashboard = () => {
         gravacoes: gravacoesData?.length || 0,
       });
     } catch (error) {
-      toast({ title: 'Erro ao buscar estatísticas', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao buscar estatÃ­sticas', description: error.message, variant: 'destructive' });
     }
     setLoadingStats(false);
   }, [user, toast]);
@@ -67,12 +67,12 @@ const Dashboard = () => {
     <>
       <Helmet>
         <title>Dashboard - IA Recorder</title>
-        <meta name="description" content="Visão geral do seu sistema de gravação de rádios." />
+        <meta name="description" content="VisÃ£o geral do seu sistema de gravaÃ§Ã£o de rÃ¡dios." />
       </Helmet>
       <div className="p-4 md:p-6 max-w-7xl mx-auto">
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-3xl md:text-4xl font-bold gradient-text">Dashboard</h1>
-          <p className="text-muted-foreground mt-2 text-lg">Visão geral do sistema de gravação.</p>
+          <p className="text-muted-foreground mt-2 text-lg">VisÃ£o geral do sistema de gravaÃ§Ã£o.</p>
         </motion.div>
 
         <motion.div
@@ -83,7 +83,7 @@ const Dashboard = () => {
         >
           <StatCard
             icon={<Radio className="w-8 h-8 text-primary-foreground" />}
-            title="Rádios Cadastradas"
+            title="RÃ¡dios Cadastradas"
             value={stats.radios}
             loading={loadingStats}
             colorClass="bg-green-500/80"
@@ -99,7 +99,7 @@ const Dashboard = () => {
           />
           <StatCard
             icon={<Download className="w-8 h-8 text-primary-foreground" />}
-            title="Gravações"
+            title="GravaÃ§Ãµes"
             value={stats.gravacoes}
             loading={loadingStats}
             colorClass="bg-purple-500/80"
@@ -114,11 +114,11 @@ const Dashboard = () => {
           transition={{ delay: 0.4 }}
         >
           <div className="card">
-            <h2 className="text-2xl font-bold text-foreground">Acesse o Painel de Rádios</h2>
-            <p className="text-muted-foreground mt-2 mb-6">Controle suas rádios, ouça ao vivo, grave manualmente e veja seus agendamentos.</p>
+            <h2 className="text-2xl font-bold text-foreground">Acesse o Painel de RÃ¡dios</h2>
+            <p className="text-muted-foreground mt-2 mb-6">Controle suas rÃ¡dios, ouÃ§a ao vivo, grave manualmente e veja seus agendamentos.</p>
             <Button className="btn btn-primary" onClick={() => navigate('/cadastro-radios')}>
               <LayoutGrid className="w-5 h-5 mr-2" />
-              Ir para Rádios
+              Ir para RÃ¡dios
             </Button>
           </div>
         </motion.div>
@@ -127,4 +127,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default Dashboard;

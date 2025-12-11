@@ -26,10 +26,10 @@ const StatCard = ({ icon, value, unit, delay }) => (
 
 const GravacoesStats = ({ stats }) => (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-    <StatCard icon={<Mic className="w-12 h-12 text-primary mb-3" />} value={stats.totalGravacoes} unit="Gravações" delay={0.1} />
+    <StatCard icon={<Mic className="w-12 h-12 text-primary mb-3" />} value={stats.totalGravacoes} unit="GravaÃ§Ãµes" delay={0.1} />
     <StatCard icon={<Clock className="w-12 h-12 text-blue-400 mb-3" />} value={(stats.totalDuration / 3600).toFixed(1)} unit="Horas Totais" delay={0.2} />
     <StatCard icon={<FileArchive className="w-12 h-12 text-green-400 mb-3" />} value={(stats.totalSize / 1024).toFixed(1)} unit="GB Totais" delay={0.3} />
-    <StatCard icon={<Mic className="w-12 h-12 text-destructive mb-3" />} value={stats.uniqueRadios} unit="Rádios Gravadas" delay={0.4} />
+    <StatCard icon={<Mic className="w-12 h-12 text-destructive mb-3" />} value={stats.uniqueRadios} unit="RÃ¡dios Gravadas" delay={0.4} />
   </div>
 );
 
@@ -44,10 +44,10 @@ const GravacoesFilter = ({ filters, setFilters, radios }) => {
       <h2 className="text-2xl font-bold text-foreground flex items-center mb-5"><Filter className="w-6 h-6 mr-3 text-purple-400" />Filtros</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div>
-          <label htmlFor="filterRadio" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por Rádio</label>
+          <label htmlFor="filterRadio" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por RÃ¡dio</label>
           <div className="relative">
             <select id="filterRadio" name="radioId" className="input appearance-none pr-10" value={filters.radioId} onChange={handleFilterChange}>
-              <option value="all">Todas as rádios</option>
+              <option value="all">Todas as rÃ¡dios</option>
               {radios.map((radio) => (
                 <option key={radio.id} value={radio.id}>{radio.nome}</option>
               ))}
@@ -87,7 +87,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 
   const handlePlay = () => {
     if (!gravacao.arquivo_url) {
-      toast({ title: 'Áudio indisponível', description: 'O arquivo desta gravação não foi encontrado.', variant: 'destructive' });
+      toast({ title: 'Ãudio indisponÃ­vel', description: 'O arquivo desta gravaÃ§Ã£o nÃ£o foi encontrado.', variant: 'destructive' });
       return;
     }
     if (isPlaying) {
@@ -97,15 +97,15 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
       onPlay();
       setGlobalAudioTrack({
         src: gravacao.arquivo_url,
-        title: gravacao.radios?.nome || 'Gravação',
-        subtitle: format(new Date(gravacao.criado_em), "d 'de' MMMM, yyyy 'às' HH:mm", { locale: ptBR }),
+        title: gravacao.radios?.nome || 'GravaÃ§Ã£o',
+        subtitle: format(new Date(gravacao.criado_em), "d 'de' MMMM, yyyy 'Ã s' HH:mm", { locale: ptBR }),
       });
     }
   };
 
   const handleDownload = async () => {
     if (!gravacao.arquivo_url) {
-      toast({ title: "Download indisponível", description: "O arquivo desta gravação não foi encontrado.", variant: 'destructive' });
+      toast({ title: "Download indisponÃ­vel", description: "O arquivo desta gravaÃ§Ã£o nÃ£o foi encontrado.", variant: 'destructive' });
       return;
     }
     try {
@@ -119,7 +119,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
-      toast({ title: "Download Iniciado", description: "O arquivo de áudio está sendo baixado." });
+      toast({ title: "Download Iniciado", description: "O arquivo de Ã¡udio estÃ¡ sendo baixado." });
     } catch (error) {
       toast({ title: "Erro no Download", description: error.message, variant: 'destructive' });
     }
@@ -129,7 +129,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
     setIsDeleting(true);
     try {
       await apiClient.batchDeleteGravacoes([gravacao.id]);
-      toast({ title: "Gravação excluída!", description: "A gravação foi removida com sucesso.", variant: "success" });
+      toast({ title: "GravaÃ§Ã£o excluÃ­da!", description: "A gravaÃ§Ã£o foi removida com sucesso.", variant: "success" });
       onDelete(gravacao.id);
     } catch (error) {
       toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
@@ -147,7 +147,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
     processando: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30 animate-pulse',
   };
   const statusText = {
-    concluido: 'Concluído', gravando: 'Gravando', erro: 'Erro', iniciando: 'Iniciando', agendado: 'Agendado', processando: 'Processando IA',
+    concluido: 'ConcluÃ­do', gravando: 'Gravando', erro: 'Erro', iniciando: 'Iniciando', agendado: 'Agendado', processando: 'Processando IA',
   };
   const formatDuration = (seconds) => {
     if (!seconds || seconds < 0) return '00:00';
@@ -161,7 +161,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
     <motion.div layout initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -50, scale: 0.9 }} transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', stiffness: 120 }} className={`card-item flex items-center p-4 gap-4 transition-all duration-300 ${isSelected ? 'bg-primary/10 border-primary' : 'border-transparent'}`}>
       <div className="flex items-center"><Checkbox checked={isSelected} onCheckedChange={() => onToggleSelection(gravacao.id)} className="mr-4" /><Button size="icon" variant="ghost" className="rounded-full w-14 h-14" onClick={handlePlay}>{isPlaying ? <Pause className="w-6 h-6 text-primary" /> : <Play className="w-6 h-6 text-primary" />}</Button></div>
       <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="flex flex-col"><span className="font-bold text-lg text-foreground truncate">{gravacao.radios?.nome || 'Rádio Desconhecida'}</span><span className="text-sm text-muted-foreground">{format(new Date(gravacao.criado_em), "d MMM, yyyy 'às' HH:mm", { locale: ptBR })}</span></div>
+        <div className="flex flex-col"><span className="font-bold text-lg text-foreground truncate">{gravacao.radios?.nome || 'RÃ¡dio Desconhecida'}</span><span className="text-sm text-muted-foreground">{format(new Date(gravacao.criado_em), "d MMM, yyyy 'Ã s' HH:mm", { locale: ptBR })}</span></div>
         <div className="flex items-center gap-6 text-sm">
           <div className="flex items-center gap-2 text-muted-foreground"><Clock className="w-4 h-4 text-blue-400" /><span>{formatDuration(gravacao.duracao_segundos)}</span></div>
           <div className="flex items-center gap-2 text-muted-foreground"><FileArchive className="w-4 h-4 text-green-400" /><span>{(gravacao.tamanho_mb || 0).toFixed(2)} MB</span></div>
@@ -170,7 +170,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
         <div className="flex items-center justify-end gap-2">
           <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${statusColors[gravacao.status] || statusColors.agendado}`}>{statusText[gravacao.status] || 'Desconhecido'}</span>
           <Button size="icon" variant="ghost" onClick={handleDownload} disabled={!gravacao.arquivo_url}><Download className="w-5 h-5" /></Button>
-          <AlertDialog><AlertDialogTrigger asChild><Button size="icon" variant="ghost" className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90"><Trash2 className="w-5 h-5" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Você tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. Isso excluirá permanentemente a gravação e todos os dados associados.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={isDeleting}>{isDeleting ? 'Excluindo...' : 'Sim, Excluir'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+          <AlertDialog><AlertDialogTrigger asChild><Button size="icon" variant="ghost" className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90"><Trash2 className="w-5 h-5" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>VocÃª tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta aÃ§Ã£o nÃ£o pode ser desfeita. Isso excluirÃ¡ permanentemente a gravaÃ§Ã£o e todos os dados associados.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={isDeleting}>{isDeleting ? 'Excluindo...' : 'Sim, Excluir'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
         </div>
       </div>
     </motion.div>
@@ -197,7 +197,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
       const data = await apiClient.getRadios();
       setRadios(data || []);
     } catch (error) {
-      toast({ title: 'Erro ao buscar rádios', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao buscar rÃ¡dios', description: error.message, variant: 'destructive' });
     }
   }, [toast]);
 
@@ -214,7 +214,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
       const statsData = await apiClient.getGravacoesStats();
       setStats(statsData || { totalGravacoes: 0, totalDuration: 0, totalSize: 0, uniqueRadios: 0 });
     } catch (error) {
-      toast({ title: 'Erro ao buscar gravações', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao buscar gravaÃ§Ãµes', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   }, [filters, toast]);
@@ -232,13 +232,13 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) {
-      toast({ title: 'Nenhuma gravação selecionada', description: 'Selecione pelo menos uma gravação para excluir.', variant: 'destructive' });
+      toast({ title: 'Nenhuma gravaÃ§Ã£o selecionada', description: 'Selecione pelo menos uma gravaÃ§Ã£o para excluir.', variant: 'destructive' });
       return;
     }
     setIsDeleting(true);
     try {
       await apiClient.batchDeleteGravacoes(Array.from(selectedIds));
-      toast({ title: 'Gravações excluídas', description: 'As gravações selecionadas foram removidas.' });
+      toast({ title: 'GravaÃ§Ãµes excluÃ­das', description: 'As gravaÃ§Ãµes selecionadas foram removidas.' });
       setSelectedIds(new Set());
       fetchGravacoes();
     } catch (error) {
@@ -276,13 +276,13 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
   return (
     <>
       <Helmet>
-        <title>Gravações - IA Recorder</title>
-        <meta name="description" content="Visualize e gerencie suas gravações." />
+        <title>GravaÃ§Ãµes - IA Recorder</title>
+        <meta name="description" content="Visualize e gerencie suas gravaÃ§Ãµes." />
       </Helmet>
       <div className="p-6 max-w-7xl mx-auto">
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-4xl font-bold gradient-text">Gravações</h1>
-          <p className="text-muted-foreground mt-2 text-lg">Gerencie todas as gravações realizadas pelo sistema.</p>
+          <h1 className="text-4xl font-bold gradient-text">GravaÃ§Ãµes</h1>
+          <p className="text-muted-foreground mt-2 text-lg">Gerencie todas as gravaÃ§Ãµes realizadas pelo sistema.</p>
         </motion.div>
 
         <div className="mt-8">
@@ -290,7 +290,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
           <GravacoesFilter filters={filters} setFilters={setFilters} radios={radios} />
 
           <div className="flex items-center justify-between mb-4">
-            <div className="text-sm text-muted-foreground">{filteredGravacoes.length} gravações encontradas</div>
+            <div className="text-sm text-muted-foreground">{filteredGravacoes.length} gravaÃ§Ãµes encontradas</div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={clearFilters} size="sm">Limpar filtros</Button>
               <Button variant="destructive" onClick={handleDeleteSelected} size="sm" disabled={selectedIds.size === 0 || isDeleting}>
@@ -306,8 +306,8 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
           ) : filteredGravacoes.length === 0 ? (
             <div className="card text-center py-12">
               <XCircle className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <h3 className="text-2xl font-bold text-white mb-2">Nenhuma gravação encontrada</h3>
-              <p className="text-muted-foreground">Ajuste os filtros ou realize novas gravações.</p>
+              <h3 className="text-2xl font-bold text-white mb-2">Nenhuma gravaÃ§Ã£o encontrada</h3>
+              <p className="text-muted-foreground">Ajuste os filtros ou realize novas gravaÃ§Ãµes.</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -333,4 +333,4 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
   );
 };
 
-export default Gravacoes;
+export default Gravacoes;

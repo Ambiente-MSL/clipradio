@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
@@ -26,10 +27,10 @@ function App() {
   return (
     <>
       <Helmet>
-        <title>Gestor de Rádios - IA Recorder</title>
+        <title>Gestor de R?dios - IA Recorder</title>
         <meta
           name="description"
-          content="Sistema avançado de gerenciamento de rádios com gravação automática e agendamento inteligente"
+          content="Sistema avan?ado de gerenciamento de r?dios com grava??o autom?tica e agendamento inteligente"
         />
       </Helmet>
 
@@ -66,7 +67,7 @@ function App() {
         />
 
         <footer className="fixed bottom-4 right-6 text-xs text-slate-200 font-light z-50 pointer-events-none">
-          By MSL Estratégia - Comunicação & Marketing
+          By MSL Estrat?gia - Comunica??o & Marketing
         </footer>
       </div>
     </>
