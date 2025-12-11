@@ -16,28 +16,35 @@ def register():
     try:
         if User.query.filter_by(email=data['email']).first():
             return jsonify({'error': 'Email already exists'}), 409
-    except SQLAlchemyError as e:
-        current_app.logger.exception("Erro ao verificar existência do usuário")
-        db.session.rollback()
-        return jsonify({'error': 'Database unavailable. Please try again.'}), 500
-    
-    nome = (data.get('nome') or data['email'].split('@')[0] or '').strip()[:255]
-    user = User(email=data['email'], nome=nome)
-    user.set_password(data['password'])
-    
-    try:
+        
+        raw_nome = data.get('nome')
+        if isinstance(raw_nome, str) and raw_nome.strip():
+            nome = raw_nome.strip()[:255]
+        else:
+            # Se veio objeto ou vazio, usa prefixo do e-mail como nome padr├úo
+            email_prefix = data['email'].split('@')[0] if '@' in data['email'] else data['email']
+            nome = (email_prefix or 'Usuario').strip()[:255]
+        
+        user = User(email=data['email'], nome=nome)
+        user.set_password(data['password'])
+        
         db.session.add(user)
         db.session.commit()
+        
+        token = create_token(user.id)
+        return jsonify({'user': user.to_dict(), 'token': token}), 201
+    
     except IntegrityError:
         db.session.rollback()
         return jsonify({'error': 'Email already exists'}), 409
     except SQLAlchemyError as e:
-        current_app.logger.exception("Erro ao registrar usuário")
+        current_app.logger.exception("Erro de banco ao registrar usuário")
         db.session.rollback()
         return jsonify({'error': 'Database error while creating user', 'detail': str(e)}), 500
-    
-    token = create_token(user.id)
-    return jsonify({'user': user.to_dict(), 'token': token}), 201
+    except Exception as e:
+        current_app.logger.exception("Erro inesperado no registro")
+        db.session.rollback()
+        return jsonify({'error': 'Internal server error', 'detail': str(e)}), 500
 
 @bp.route('/login', methods=['POST'])
 def login():

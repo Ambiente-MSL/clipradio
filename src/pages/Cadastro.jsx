@@ -4,13 +4,12 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { UserPlus, Loader, ShieldCheck, LogIn } from 'lucide-react';
+import { UserPlus, Loader } from 'lucide-react';
 
 const Cadastro = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
   
   const { signUp, user } = useAuth();
   const navigate = useNavigate();
@@ -26,47 +25,23 @@ const Cadastro = () => {
     e.preventDefault();
     setIsSubmitting(true);
     
-    const { error } = await signUp(email, password, {
-      emailRedirectTo: `${window.location.origin}/login`
-    });
+    const nome = (email.split('@')[0] || 'Usuario').slice(0, 255);
+
+    const { error } = await signUp(email, password, nome);
 
     if (!error) {
-      setEmailConfirmationSent(true);
       toast({
-          title: "Confirmação necessária!",
-          description: "Enviamos um link de confirmação para o seu e-mail. Por favor, verifique sua caixa de entrada.",
-          duration: 9000
+          title: "Cadastro realizado!",
+          description: "Conta criada com sucesso. Você já pode fazer login.",
+          duration: 6000
       });
+      navigate('/login');
     }
     
     setIsSubmitting(false);
   };
 
-  if (emailConfirmationSent) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md card text-center"
-        >
-          <ShieldCheck className="w-16 h-16 text-green-400 mx-auto mb-6" />
-          <h1 className="text-3xl font-bold gradient-text mb-4">Verifique seu E-mail</h1>
-          <p className="text-slate-300 text-lg">
-            Um link de confirmação foi enviado para <span className="font-bold text-cyan-400">{email}</span>.
-          </p>
-          <p className="text-slate-400 mt-2">
-            Clique no link para ativar sua conta e depois faça o login.
-          </p>
-          <Link to="/login">
-            <Button className="mt-8 btn btn-primary">
-              Ir para Login
-            </Button>
-          </Link>
-        </motion.div>
-      </div>
-    );
-  }
+  // Fluxo direto (sem etapa de confirmação de e-mail)
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
