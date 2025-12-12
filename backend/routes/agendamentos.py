@@ -5,6 +5,7 @@ from utils.jwt_utils import token_required, decode_token
 from flask import request as flask_request
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from services.scheduler_service import schedule_agendamento, unschedule_agendamento
 
 LOCAL_TZ = ZoneInfo("America/Fortaleza")
 
@@ -79,6 +80,13 @@ def create_agendamento():
     # Broadcast update
     from services.websocket_service import broadcast_update
     broadcast_update(f'user_{user_id}', 'agendamento_created', agendamento.to_dict())
+
+    # Agenda execução futura
+    if agendamento.status == 'agendado':
+        try:
+            schedule_agendamento(agendamento)
+        except Exception as e:
+            print(f"Falha ao agendar job do agendamento {agendamento.id}: {e}")
     
     return jsonify(agendamento.to_dict(include_radio=True)), 201
 
@@ -111,6 +119,15 @@ def update_agendamento(agendamento_id):
     # Broadcast update
     from services.websocket_service import broadcast_update
     broadcast_update(f'user_{user_id}', 'agendamento_updated', agendamento.to_dict())
+
+    # Atualiza job do scheduler conforme status
+    if agendamento.status == 'agendado':
+        try:
+            schedule_agendamento(agendamento)
+        except Exception as e:
+            print(f"Falha ao reagendar job do agendamento {agendamento.id}: {e}")
+    else:
+        unschedule_agendamento(agendamento.id)
     
     return jsonify(agendamento.to_dict(include_radio=True)), 200
 
@@ -124,6 +141,9 @@ def delete_agendamento(agendamento_id):
     
     db.session.delete(agendamento)
     db.session.commit()
+
+    # Remover job agendado, se existir
+    unschedule_agendamento(agendamento_id)
     
     # Broadcast update
     from services.websocket_service import broadcast_update
