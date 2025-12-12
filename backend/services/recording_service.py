@@ -6,34 +6,50 @@ import subprocess
 import os
 from config import Config
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+LOCAL_TZ = ZoneInfo("America/Fortaleza")
 
 def start_recording(gravacao):
     """Inicia gravação de um stream de rádio"""
     radio = Radio.query.get(gravacao.radio_id)
-    if not radio:
-        raise ValueError("Radio not found")
+    if not radio or not radio.stream_url:
+        raise ValueError("Radio not found or stream_url missing")
     
+    # Garantir diretório
+    os.makedirs(os.path.join(Config.STORAGE_PATH, 'audio'), exist_ok=True)
+
     # Atualizar status
     gravacao.status = 'gravando'
     db.session.commit()
     
-    # Gerar nome do arquivo
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    # Gerar nome do arquivo (timestamp no fuso local)
+    timestamp = datetime.now(tz=LOCAL_TZ).strftime('%Y%m%d_%H%M%S')
     filename = f"{gravacao.id}_{timestamp}.mp3"
     filepath = os.path.join(Config.STORAGE_PATH, 'audio', filename)
     
     # Iniciar gravação com ffmpeg (em background)
-    # ffmpeg -i <stream_url> -t <duration> -acodec libmp3lame <output>
     duration_seconds = gravacao.duracao_minutos * 60 if gravacao.duracao_minutos else 3600
     
-    process = subprocess.Popen([
-        'ffmpeg',
-        '-i', radio.stream_url,
-        '-t', str(duration_seconds),
-        '-acodec', 'libmp3lame',
-        '-b:a', '128k',
-        filepath
-    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        process = subprocess.Popen(
+            [
+                'ffmpeg',
+                '-nostdin',
+                '-y',
+                '-i', radio.stream_url,
+                '-t', str(duration_seconds),
+                '-acodec', 'libmp3lame',
+                '-b:a', '128k',
+                filepath
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+    except Exception as e:
+        gravacao.status = 'erro'
+        db.session.commit()
+        raise e
     
     # Atualizar gravacao com informações do arquivo
     gravacao.arquivo_nome = filename
@@ -90,4 +106,3 @@ def process_audio_with_ai(gravacao, palavras_chave):
     })
     
     return {'clips_created': len(clips)}
-
