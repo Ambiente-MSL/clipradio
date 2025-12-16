@@ -4,6 +4,7 @@ from models.gravacao import Gravacao
 from utils.jwt_utils import token_required, decode_token
 from flask import request as flask_request
 from datetime import datetime
+from services.recording_service import hydrate_gravacao_metadata
 
 bp = Blueprint('gravacoes', __name__)
 
@@ -81,6 +82,9 @@ def get_gravacoes():
                      (not cidade or (g.radio.cidade and cidade.lower() in g.radio.cidade.lower())) and
                      (not estado or (g.radio.estado and estado.upper() == g.radio.estado.upper()))]
     
+    # Enriquecer metadados com dados reais do arquivo (duração, tamanho, status)
+    gravacoes = [hydrate_gravacao_metadata(g, autocommit=True) for g in gravacoes]
+    
     return jsonify([g.to_dict(include_radio=True) for g in gravacoes]), 200
 
 @bp.route('/<gravacao_id>', methods=['GET'])
@@ -92,6 +96,7 @@ def get_gravacao(gravacao_id):
     gravacao = Gravacao.query.filter_by(id=gravacao_id).first() if is_admin else Gravacao.query.filter_by(id=gravacao_id, user_id=user_id).first()
     if not gravacao:
         return jsonify({'error': 'Gravacao not found'}), 404
+    gravacao = hydrate_gravacao_metadata(gravacao, autocommit=True)
     return jsonify(gravacao.to_dict(include_radio=True)), 200
 
 @bp.route('/<gravacao_id>', methods=['DELETE'])
@@ -148,6 +153,9 @@ def get_stats():
     user_id = ctx.get('user_id')
     is_admin = ctx.get('is_admin', False)
     gravacoes = Gravacao.query.all() if is_admin else Gravacao.query.filter_by(user_id=user_id).all()
+
+    # Garantir que duração/tamanho reflitam o arquivo salvo
+    gravacoes = [hydrate_gravacao_metadata(g, autocommit=True) for g in gravacoes]
     
     total = len(gravacoes)
     total_duration = sum(g.duracao_segundos or 0 for g in gravacoes)

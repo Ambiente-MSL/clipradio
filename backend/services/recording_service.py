@@ -1,7 +1,7 @@
 import os
 import subprocess
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from flask import current_app
@@ -13,6 +13,19 @@ from services.websocket_service import broadcast_update
 
 LOCAL_TZ = ZoneInfo("America/Fortaleza")
 MIN_RECORD_SECONDS = 10  # evita gravação zero em caso de input faltando
+
+
+def _get_audio_filepath(gravacao):
+    """Retorna o caminho absoluto do arquivo de áudio associado, se houver."""
+    if not gravacao:
+        return None
+    filename = gravacao.arquivo_nome
+    if not filename and getattr(gravacao, "arquivo_url", None):
+        filename = gravacao.arquivo_url.rsplit("/", 1)[-1]
+    if not filename:
+        return None
+    return os.path.join(Config.STORAGE_PATH, "audio", filename)
+
 
 def _probe_duration_seconds(filepath):
     """Obtém duração real via ffprobe; retorna None se falhar."""
@@ -32,21 +45,81 @@ def _probe_duration_seconds(filepath):
             ],
             stderr=subprocess.STDOUT,
         )
-        return int(float(out.strip()))
+        return int(round(float(out.strip())))
     except Exception:
         return None
+
+
+def _file_size_mb(filepath):
+    """Obtém tamanho do arquivo em MB (duas casas)."""
+    if not filepath or not os.path.exists(filepath):
+        return None
+    try:
+        return round(os.path.getsize(filepath) / (1024 * 1024), 2)
+    except Exception:
+        return None
+
+
+def hydrate_gravacao_metadata(gravacao, *, autocommit=False):
+    """
+    Garante que duração, tamanho e status estejam consistentes com o arquivo físico.
+    - Lê o arquivo em disco (se existir) para preencher duracao_segundos/minutos e tamanho_mb.
+    - Se o tempo previsto já passou e ainda está marcado como gravando/iniciando, marca como concluído.
+    Retorna o objeto (já ajustado).
+    """
+    if not gravacao:
+        return gravacao
+
+    changed = False
+    filepath = _get_audio_filepath(gravacao)
+
+    # Tamanho real
+    size_mb = _file_size_mb(filepath)
+    if size_mb is not None and (gravacao.tamanho_mb or 0) != size_mb:
+        gravacao.tamanho_mb = size_mb
+        changed = True
+
+    # Duração real
+    real_duration = _probe_duration_seconds(filepath)
+    if real_duration:
+        if (gravacao.duracao_segundos or 0) != real_duration:
+            gravacao.duracao_segundos = real_duration
+            gravacao.duracao_minutos = max(1, round(real_duration / 60))
+            changed = True
+
+    # Atualizar status automaticamente se o tempo previsto já passou
+    expected_duration = gravacao.duracao_segundos or (
+        (gravacao.duracao_minutos or 0) * 60
+    )
+    if expected_duration <= 0:
+        expected_duration = MIN_RECORD_SECONDS
+    if gravacao.criado_em and gravacao.status in ("iniciando", "gravando"):
+        try:
+            expected_end = gravacao.criado_em + timedelta(seconds=expected_duration + 5)
+            now = datetime.now(tz=gravacao.criado_em.tzinfo or LOCAL_TZ)
+            if now >= expected_end:
+                gravacao.status = "concluido"
+                changed = True
+        except Exception:
+            pass
+
+    if autocommit and changed:
+        db.session.commit()
+
+    return gravacao
 
 
 def _finalizar_gravacao(gravacao, status, filepath=None, duration_seconds=None, agendamento=None):
     """Atualiza status, tamanhos e emite broadcast."""
     try:
-        if filepath and os.path.exists(filepath):
-            gravacao.tamanho_mb = round(os.path.getsize(filepath) / (1024 * 1024), 2)
+        file_size = _file_size_mb(filepath)
+        if file_size is not None:
+            gravacao.tamanho_mb = file_size
     except Exception:
         pass
 
     # Preferir duração real do arquivo, se existir
-    real_duration = duration_seconds or _probe_duration_seconds(filepath)
+    real_duration = _probe_duration_seconds(filepath) or duration_seconds
     if real_duration:
         gravacao.duracao_segundos = real_duration
         gravacao.duracao_minutos = max(1, round(real_duration / 60))
@@ -88,6 +161,10 @@ def start_recording(gravacao, *, duration_seconds=None, agendamento=None, block=
     if duration_seconds <= 0:
         duration_seconds = 300  # 5min padrão se nada informado
     duration_seconds = max(MIN_RECORD_SECONDS, duration_seconds)
+
+    # Guardar duração planejada para cálculo de status e exibição
+    gravacao.duracao_segundos = duration_seconds
+    gravacao.duracao_minutos = max(1, round(duration_seconds / 60))
 
     timestamp = datetime.now(tz=LOCAL_TZ).strftime('%Y%m%d_%H%M%S')
     filename = f"{gravacao.id}_{timestamp}.mp3"
@@ -188,7 +265,8 @@ def start_recording(gravacao, *, duration_seconds=None, agendamento=None, block=
 
 def stop_recording(gravacao):
     """Para gravação em andamento manualmente."""
-    _finalizar_gravacao(gravacao, 'concluido')
+    filepath = _get_audio_filepath(gravacao)
+    _finalizar_gravacao(gravacao, 'concluido', filepath=filepath)
 
 def process_audio_with_ai(gravacao, palavras_chave):
     """Processa áudio com IA para gerar clipes"""

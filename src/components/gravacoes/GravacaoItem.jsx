@@ -85,7 +85,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
   };
 
   const statusText = {
-    concluido: 'Gravado',
+    concluido: 'Concluído',
     gravando: 'Gravando',
     erro: 'Erro',
     iniciando: 'Iniciando',
