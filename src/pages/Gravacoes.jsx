@@ -98,7 +98,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
       setGlobalAudioTrack({
         src: gravacao.arquivo_url,
         title: gravacao.radios?.nome || 'Gravação',
-        subtitle: format(new Date(gravacao.criado_em), "d 'de' MMMM, yyyy 'às' HH:mm", { locale: ptBR }),
+        subtitle: `${gravacao.radios?.cidade ? gravacao.radios.cidade + ' - ' : ''}Gravado em: ${format(new Date(gravacao.criado_em), "d 'de' MMMM, yyyy 'às' HH:mm", { locale: ptBR })}`,
       });
     }
   };
@@ -161,7 +161,13 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
     <motion.div layout initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -50, scale: 0.9 }} transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', stiffness: 120 }} className={`card-item flex items-center p-4 gap-4 transition-all duration-300 ${isSelected ? 'bg-primary/10 border-primary' : 'border-transparent'}`}>
       <div className="flex items-center"><Checkbox checked={isSelected} onCheckedChange={() => onToggleSelection(gravacao.id)} className="mr-4" /><Button size="icon" variant="ghost" className="rounded-full w-14 h-14" onClick={handlePlay}>{isPlaying ? <Pause className="w-6 h-6 text-primary" /> : <Play className="w-6 h-6 text-primary" />}</Button></div>
       <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="flex flex-col"><span className="font-bold text-lg text-foreground truncate">{gravacao.radios?.nome || 'Rádio Desconhecida'}</span><span className="text-sm text-muted-foreground">{format(new Date(gravacao.criado_em), "d MMM, yyyy 'às' HH:mm", { locale: ptBR })}</span></div>
+        <div className="flex flex-col">
+          <span className="font-bold text-lg text-foreground truncate">{gravacao.radios?.nome || 'Rádio Desconhecida'}</span>
+          <span className="text-sm text-muted-foreground">
+            {gravacao.radios?.cidade && <span>{gravacao.radios.cidade} - </span>}
+            Gravado em: {format(new Date(gravacao.criado_em), "d MMM, yyyy 'às' HH:mm", { locale: ptBR })}
+          </span>
+        </div>
         <div className="flex items-center gap-6 text-sm">
           <div className="flex items-center gap-2 text-muted-foreground"><Clock className="w-4 h-4 text-blue-400" /><span>{formatDuration(gravacao.duracao_segundos)}</span></div>
           <div className="flex items-center gap-2 text-muted-foreground"><FileArchive className="w-4 h-4 text-green-400" /><span>{(gravacao.tamanho_mb || 0).toFixed(2)} MB</span></div>
