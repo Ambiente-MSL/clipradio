@@ -19,8 +19,9 @@ class Gravacao(db.Model):
     duracao_minutos = db.Column(db.Integer, default=0)
     tamanho_mb = db.Column(db.Float, default=0.0)
     batch_id = db.Column(db.String(36))  # Para gravação em massa
-    criado_em = db.Column(db.DateTime, default=lambda: datetime.now(tz=LOCAL_TZ), index=True)
-    atualizado_em = db.Column(db.DateTime, default=lambda: datetime.now(tz=LOCAL_TZ), onupdate=lambda: datetime.now(tz=LOCAL_TZ))
+    # Guardar timestamps com timezone para evitar deslocamento de hora
+    criado_em = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(tz=LOCAL_TZ), index=True)
+    atualizado_em = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(tz=LOCAL_TZ), onupdate=lambda: datetime.now(tz=LOCAL_TZ))
     
     # Relacionamentos
     clips = db.relationship('Clip', backref='gravacao', lazy=True, cascade='all, delete-orphan')
