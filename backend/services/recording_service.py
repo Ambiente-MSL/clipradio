@@ -12,6 +12,7 @@ from models.radio import Radio
 from services.websocket_service import broadcast_update
 
 LOCAL_TZ = ZoneInfo("America/Fortaleza")
+MIN_RECORD_SECONDS = 10  # evita gravação zero em caso de input faltando
 
 
 def _finalizar_gravacao(gravacao, status, filepath=None, duration_seconds=None, agendamento=None):
@@ -52,7 +53,17 @@ def start_recording(gravacao, *, duration_seconds=None, agendamento=None, block=
 
     os.makedirs(os.path.join(Config.STORAGE_PATH, 'audio'), exist_ok=True)
 
-    duration_seconds = duration_seconds or (gravacao.duracao_minutos * 60 if gravacao.duracao_minutos else 3600)
+    # Definir duração com fallback seguro (evita ficar gravando indefinidamente)
+    duration_seconds = duration_seconds or gravacao.duracao_segundos or (
+        gravacao.duracao_minutos * 60 if gravacao.duracao_minutos else 0
+    )
+    try:
+        duration_seconds = int(duration_seconds)
+    except Exception:
+        duration_seconds = 0
+    if duration_seconds <= 0:
+        duration_seconds = 300  # 5min padrão se nada informado
+    duration_seconds = max(MIN_RECORD_SECONDS, duration_seconds)
 
     timestamp = datetime.now(tz=LOCAL_TZ).strftime('%Y%m%d_%H%M%S')
     filename = f"{gravacao.id}_{timestamp}.mp3"
@@ -102,7 +113,14 @@ def start_recording(gravacao, *, duration_seconds=None, agendamento=None, block=
         else:
             ctx = None
         try:
-            return_code = ffmpeg_process.wait()
+            # Timeout de segurança: duração solicitada + 20s
+            try:
+                return_code = ffmpeg_process.wait(timeout=duration_seconds + 20)
+                timed_out = False
+            except subprocess.TimeoutExpired:
+                ffmpeg_process.terminate()
+                return_code = -1
+                timed_out = True
             stderr_output = b''
             try:
                 if ffmpeg_process.stderr:
@@ -121,7 +139,7 @@ def start_recording(gravacao, *, duration_seconds=None, agendamento=None, block=
                 # Logar erro para depurar streams que nÇ¬o gravam
                 msg = (
                     f"ffmpeg failed for gravacao {gravacao.id} "
-                    f"(return_code={return_code}, exists={file_exists}, size={file_size})"
+                    f"(return_code={return_code}, exists={file_exists}, size={file_size}, timed_out={timed_out})"
                 )
                 try:
                     if stderr_output:
