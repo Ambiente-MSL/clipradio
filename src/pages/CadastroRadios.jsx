@@ -516,7 +516,7 @@ const CadastroRadios = () => {
                             <div className="flex items-center gap-2">
                               <h3 className="text-lg font-semibold text-white">{radio.nome}</h3>
                               {activeRecordingId === radio.id && (
-                                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                                <span className="text-xs font-semibold text-red-300 animate-pulse">Gravando</span>
                               )}
                             </div>
                             <p className="text-sm text-slate-400 break-all">{radio.stream_url}</p>
@@ -539,12 +539,12 @@ const CadastroRadios = () => {
                           <MapPin className="w-4 h-4" />
                           {radio.estado || '--'}
                         </span>
-                        {scheduledRadioIds.has(radio.id) && (
-                          <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 text-[11px] font-semibold">
-                            <Clock className="w-3 h-3" /> Agendado
-                          </span>
-                        )}
-                      </div>
+                          {scheduledRadioIds.has(radio.id) && (
+                            <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 text-[11px] font-semibold">
+                              <Clock className="w-3 h-3" /> Agendado
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 text-xs text-slate-300">
                           <span className="px-2 py-1 rounded-full bg-slate-800/80 border border-slate-700">
                             {radio.bitrate_kbps || 128} kbps
@@ -653,11 +653,6 @@ const CadastroRadios = () => {
                               <MapPin className="w-3 h-3" />
                               {radio.estado || '--'}
                             </span>
-                            {activeRecordingId === radio.id && (
-                              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/40 text-red-300">
-                                <CircleDot className="w-3 h-3 animate-pulse" /> Gravando
-                              </span>
-                            )}
                             {scheduledRadioIds.has(radio.id) && (
                               <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 text-[11px] font-semibold">
                                 <Clock className="w-3 h-3" /> Agendado

@@ -662,27 +662,15 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
                   >
 
                     <div className="flex items-center gap-3">
-
-                      <CircleDot className="w-4 h-4 text-red-400 animate-pulse" />
-
                       <div className="flex flex-col">
-
                         <span className="text-white font-semibold">{gravacao.radios?.nome || 'Radio'}</span>
-
                         <span className="text-xs text-slate-400">
-
                           Iniciada em {format(new Date(gravacao.criado_em), "d MMM 'as' HH:mm", { locale: ptBR })}
-
                         </span>
-
                       </div>
-
                     </div>
-
-                    <span className="text-sm text-slate-300 px-3 py-1 rounded-full bg-slate-800 border border-slate-700">
-
-                      {gravacao.status === 'gravando' ? 'Gravando' : 'Iniciando'}
-
+                    <span className={`text-sm px-3 py-1 rounded-full border ${gravacao.status === 'iniciando' ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-200 animate-pulse' : 'bg-red-500/15 border-red-500/40 text-red-200 animate-pulse'}`}>
+                      {gravacao.status === 'iniciando' ? 'Iniciando' : 'Gravando'}
                     </span>
 
                   </div>
