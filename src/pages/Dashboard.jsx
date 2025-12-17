@@ -66,7 +66,7 @@ const Dashboard = () => {
   return (
     <>
       <Helmet>
-        <title>Dashboard</title>
+        <title>Dashboard | Clipradio</title>
         <meta name="description" content="Visão geral do seu sistema de gravação de rádios." />
       </Helmet>
       <div className="p-4 md:p-6 max-w-7xl mx-auto">

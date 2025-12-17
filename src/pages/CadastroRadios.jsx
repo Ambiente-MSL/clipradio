@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Radio, Globe, Plus, Edit, Trash2, Star, StarOff, Loader, MapPin, Play, Pause, CheckCircle, AlertCircle, LayoutGrid, List } from 'lucide-react'
+import { Radio, Globe, Plus, Edit, Trash2, Star, StarOff, Loader, MapPin, Play, Pause, CheckCircle, AlertCircle, LayoutGrid, List, CircleDot } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 import { Button } from '@/components/ui/button'
 import apiClient from '@/lib/apiClient'
@@ -25,6 +25,9 @@ const CadastroRadios = () => {
   const [isBuffering, setIsBuffering] = useState(false)
   const [streamStatus, setStreamStatus] = useState({ state: 'idle', message: '' })
   const [viewMode, setViewMode] = useState('card')
+  const [recordPanelRadioId, setRecordPanelRadioId] = useState(null)
+  const [recordDuration, setRecordDuration] = useState(15)
+  const [startingRecording, setStartingRecording] = useState(false)
   const audioRef = useRef(null)
   const validationAudioRef = useRef(null)
   const { toast } = useToast()
@@ -235,6 +238,73 @@ const CadastroRadios = () => {
 
   const isPlaying = (id) => currentRadioId === id && audioRef.current && !audioRef.current.paused
 
+  const toggleRecordPanel = (radioId) => {
+    if (recordPanelRadioId === radioId) {
+      setRecordPanelRadioId(null)
+    } else {
+      setRecordPanelRadioId(radioId)
+      setRecordDuration(15)
+    }
+  }
+
+  const handleStartRecording = async (radio) => {
+    if (!radio?.id) return
+    setStartingRecording(true)
+    try {
+      const gravacao = await apiClient.createGravacao({
+        radio_id: radio.id,
+        duracao_minutos: recordDuration,
+        status: 'iniciando',
+        tipo: 'manual',
+      })
+
+      await apiClient.startRecording(gravacao.id)
+      toast({
+        title: 'Gravacao iniciada',
+        description: `${radio.nome} por ${recordDuration} minutos.`,
+      })
+      setRecordPanelRadioId(null)
+    } catch (error) {
+      toast({
+        title: 'Erro ao iniciar',
+        description: error.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setStartingRecording(false)
+    }
+  }
+
+  const sliderStyle = `
+    .record-slider {
+      appearance: none;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(to right, #ffffff55, #ffffff22);
+      border-radius: 999px;
+    }
+    .record-slider:focus { outline: none; }
+    .record-slider::-webkit-slider-thumb {
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border: 2px solid #e5e7eb;
+      background: #0f172a;
+      border-radius: 999px;
+      box-shadow: 0 0 0 2px #0f172a;
+      cursor: pointer;
+    }
+    .record-slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border: 2px solid #e5e7eb;
+      background: #0f172a;
+      border-radius: 999px;
+      box-shadow: 0 0 0 2px #0f172a;
+      cursor: pointer;
+    }
+  `
+
   const renderStreamStatusIcon = () => {
     if (streamStatus.state === 'loading') {
       return <Loader className="w-4 h-4 text-cyan-400 animate-spin" />
@@ -250,6 +320,7 @@ const CadastroRadios = () => {
 
   return (
     <div className="min-h-screen p-4 md:p-6">
+      <style>{sliderStyle}</style>
       <div className="max-w-7xl mx-auto">
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold gradient-text mb-2">Gerenciador de Rádios</h1>
@@ -466,6 +537,15 @@ const CadastroRadios = () => {
                           </Button>
                           <Button
                             size="sm"
+                            variant={recordPanelRadioId === radio.id ? 'default' : 'outline'}
+                            onClick={() => toggleRecordPanel(radio.id)}
+                            className="flex items-center gap-2"
+                          >
+                            <CircleDot className="w-4 h-4 text-red-400" />
+                            Gravar
+                          </Button>
+                          <Button
+                            size="sm"
                             onClick={() => handlePlayPause(radio)}
                             className="ml-auto flex items-center gap-2"
                           >
@@ -481,6 +561,34 @@ const CadastroRadios = () => {
                             )}
                           </Button>
                         </div>
+                        {recordPanelRadioId === radio.id && (
+                          <div className="mt-3 p-3 rounded-lg bg-slate-900/70 border border-slate-800">
+                            <div className="flex items-center justify-between text-xs text-slate-300 mb-2">
+                              <span>1 min</span>
+                              <span>{recordDuration} min</span>
+                              <span>60 min</span>
+                            </div>
+                            <input
+                              type="range"
+                              min="1"
+                              max="60"
+                              step="1"
+                              value={recordDuration}
+                              onChange={(e) => setRecordDuration(Number(e.target.value))}
+                              className="record-slider"
+                            />
+                            <div className="flex justify-end mt-3">
+                              <Button
+                                size="sm"
+                                disabled={startingRecording}
+                                onClick={() => handleStartRecording(radio)}
+                                className="bg-red-500 hover:bg-red-600 text-white"
+                              >
+                                {startingRecording ? 'Iniciando...' : 'Iniciar gravacao'}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

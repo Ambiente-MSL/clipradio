@@ -69,6 +69,9 @@ const Navbar = () => {
             ))}
           </nav>
           <div className="flex items-center gap-4">
+            <NavLink to="/gravacoes" className={getNavLinkClass('/gravacoes')}>
+              <FileText className="w-5 h-5" />
+            </NavLink>
             <NavLink to="/profile" className={getNavLinkClass('/profile')}>
               <User className="w-5 h-5" />
             </NavLink>

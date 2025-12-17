@@ -29,7 +29,7 @@ const GravacoesStats = ({ stats }) => (
     <StatCard icon={<Mic className="w-12 h-12 text-primary mb-3" />} value={stats.totalGravacoes} unit="Gravações" delay={0.1} />
     <StatCard icon={<Clock className="w-12 h-12 text-blue-400 mb-3" />} value={(stats.totalDuration / 3600).toFixed(1)} unit="Horas Totais" delay={0.2} />
     <StatCard icon={<FileArchive className="w-12 h-12 text-green-400 mb-3" />} value={(stats.totalSize / 1024).toFixed(1)} unit="GB Totais" delay={0.3} />
-    <StatCard icon={<Mic className="w-12 h-12 text-destructive mb-3" />} value={stats.uniqueRadios} unit="Rádios Gravadas" delay={0.4} />
+    <StatCard icon={<Mic className="w-12 h-12 text-destructive mb-3" />} value={stats.uniqueradios} unit="RáRadios Gravadas" delay={0.4} />
   </div>
 );
 
@@ -44,12 +44,12 @@ const GravacoesFilter = ({ filters, setFilters, radios }) => {
       <h2 className="text-2xl font-bold text-foreground flex items-center mb-5"><Filter className="w-6 h-6 mr-3 text-purple-400" />Filtros</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div>
-          <label htmlFor="filterRadio" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por Rádio</label>
+          <label htmlFor="filterRaRadio" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por RáRadio</label>
           <div className="relative">
-            <select id="filterRadio" name="radioId" className="input appearance-none pr-10" value={filters.radioId} onChange={handleFilterChange}>
-              <option value="all">Todas as rádios</option>
-              {radios.map((radio) => (
-                <option key={radio.id} value={radio.id}>{radio.nome}</option>
+            <select id="filterRaRadio" name="raRadioId" className="input appearance-none pr-10" value={filters.raRadioId} onChange={handleFilterChange}>
+              <option value="all">Todas as ráRadios</option>
+              {radios.map((raRadio) => (
+                <option key={raRadio.id} value={raRadio.id}>{raRadio.nome}</option>
               ))}
             </select>
             <ListFilter className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -81,21 +81,21 @@ const GravacoesFilter = ({ filters, setFilters, radios }) => {
   );
 };
 
-const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAudioTrack, onDelete, isSelected, onToggleSelection }) => {
+const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAuRadioTrack, onDelete, isSelected, onToggleSelection }) => {
   const { toast } = useToast();
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handlePlay = () => {
     if (!gravacao.arquivo_url) {
-      toast({ title: 'Áudio indisponível', description: 'O arquivo desta gravação não foi encontrado.', variant: 'destructive' });
+      toast({ title: 'ÁuRadio indisponível', description: 'O arquivo desta gravação não foi encontrado.', variant: 'destructive' });
       return;
     }
     if (isPlaying) {
       onStop();
-      setGlobalAudioTrack(null);
+      setGlobalAuRadioTrack(null);
     } else {
       onPlay();
-      setGlobalAudioTrack({
+      setGlobalAuRadioTrack({
         src: gravacao.arquivo_url,
         title: gravacao.radios?.nome || 'Gravação',
         subtitle: `${gravacao.radios?.cidade ? gravacao.radios.cidade + ' - ' : ''}Gravado em: ${format(new Date(gravacao.criado_em), "d 'de' MMMM, yyyy 'às' HH:mm", { locale: ptBR })}`,
@@ -119,7 +119,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
-      toast({ title: "Download Iniciado", description: "O arquivo de áudio está sendo baixado." });
+      toast({ title: "Download Iniciado", description: "O arquivo de áuRadio está sendo baixado." });
     } catch (error) {
       toast({ title: "Erro no Download", description: error.message, variant: 'destructive' });
     }
@@ -162,7 +162,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
       <div className="flex items-center"><Checkbox checked={isSelected} onCheckedChange={() => onToggleSelection(gravacao.id)} className="mr-4" /><Button size="icon" variant="ghost" className="rounded-full w-14 h-14" onClick={handlePlay}>{isPlaying ? <Pause className="w-6 h-6 text-primary" /> : <Play className="w-6 h-6 text-primary" />}</Button></div>
       <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="flex flex-col">
-          <span className="font-bold text-lg text-foreground truncate">{gravacao.radios?.nome || 'Rádio Desconhecida'}</span>
+          <span className="font-bold text-lg text-foreground truncate">{gravacao.radios?.nome || 'RáRadio Desconhecida'}</span>
           <span className="text-sm text-muted-foreground">
             {gravacao.radios?.cidade && <span>{gravacao.radios.cidade} - </span>}
             Gravado em: {format(new Date(gravacao.criado_em), "d MMM, yyyy 'às' HH:mm", { locale: ptBR })}
@@ -183,27 +183,28 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
   );
 };
 
-const Gravacoes = ({ setGlobalAudioTrack }) => {
+const Gravacoes = ({ setGlobalAuRadioTrack }) => {
   const [gravacoes, setGravacoes] = useState([]);
-  const [radios, setRadios] = useState([]);
+  const [radios, setradios] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ totalGravacoes: 0, totalDuration: 0, totalSize: 0, uniqueRadios: 0 });
+  const [stats, setStats] = useState({ totalGravacoes: 0, totalDuration: 0, totalSize: 0, uniqueradios: 0 });
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const initialRadioId = searchParams.get('radioId') || 'all';
+  const initialRaRadioId = searchParams.get('raRadioId') || 'all';
 
-  const [filters, setFilters] = useState({ radioId: initialRadioId, data: '', cidade: '', estado: '' });
+  const [filters, setFilters] = useState({ raRadioId: initialRaRadioId, data: '', cidade: '', estado: '' });
   const [currentPlayingId, setCurrentPlayingId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
+  const [activeTab, setActiveTab] = useState('all');
   const { toast } = useToast();
 
-  const fetchRadios = useCallback(async () => {
+  const fetchradios = useCallback(async () => {
     try {
-      const data = await apiClient.getRadios();
-      setRadios(data || []);
+      const data = await apiClient.getradios();
+      setradios(data || []);
     } catch (error) {
-      toast({ title: 'Erro ao buscar rádios', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao buscar ráRadios', description: error.message, variant: 'destructive' });
     }
   }, [toast]);
 
@@ -211,14 +212,14 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
     setLoading(true);
     try {
       const data = await apiClient.getGravacoes({
-        radioId: filters.radioId !== 'all' ? filters.radioId : undefined,
+        raRadioId: filters.raRadioId !== 'all' ? filters.raRadioId : undefined,
         data: filters.data,
         cidade: filters.cidade,
         estado: filters.estado,
       });
       setGravacoes(data || []);
       const statsData = await apiClient.getGravacoesStats();
-      setStats(statsData || { totalGravacoes: 0, totalDuration: 0, totalSize: 0, uniqueRadios: 0 });
+      setStats(statsData || { totalGravacoes: 0, totalDuration: 0, totalSize: 0, uniqueradios: 0 });
     } catch (error) {
       toast({ title: 'Erro ao buscar gravações', description: error.message, variant: 'destructive' });
     }
@@ -226,8 +227,8 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
   }, [filters, toast]);
 
   useEffect(() => {
-    fetchRadios();
-  }, [fetchRadios]);
+    fetchradios();
+  }, [fetchradios]);
 
   useEffect(() => {
     fetchGravacoes();
@@ -275,28 +276,40 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
     });
   };
 
-  const clearFilters = () => setFilters({ radioId: 'all', data: '', cidade: '', estado: '' });
+  const clearFilters = () => setFilters({ raRadioId: 'all', data: '', cidade: '', estado: '' });
 
   const filteredGravacoes = useMemo(() => gravacoes, [gravacoes]);
+  const ongoingGravacoes = useMemo(
+    () => filteredGravacoes.filter((g) => ['gravando', 'iniciando', 'processando'].includes(g.status)),
+    [filteredGravacoes]
+  );
 
   return (
     <>
       <Helmet>
         <title></title>
-        <meta name="description" content="Visualize e gerencie suas gravações." />
+        <meta name="description" content="Visualize e gerencie suas gravacoes." />
       </Helmet>
       <div className="p-6 max-w-7xl mx-auto">
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-4xl font-bold gradient-text">Gravações</h1>
-          <p className="text-muted-foreground mt-2 text-lg">Gerencie todas as gravações realizadas pelo sistema.</p>
+          <h1 className="text-4xl font-bold gradient-text">Gravacoes</h1>
+          <p className="text-muted-foreground mt-2 text-lg">Gerencie todas as gravacoes realizadas pelo sistema.</p>
         </motion.div>
 
         <div className="mt-8">
+          <div className="flex flex-wrap items-center gap-3 mb-6">
+            <Button size="sm" variant={activeTab === 'all' ? 'default' : 'outline'} onClick={() => setActiveTab('all')}>
+              Todas as gravacoes
+            </Button>
+            <Button size="sm" variant={activeTab === 'live' ? 'default' : 'outline'} onClick={() => setActiveTab('live')}> 
+              Gravando agora
+            </Button>
+          </div>
           <GravacoesStats stats={stats} />
           <GravacoesFilter filters={filters} setFilters={setFilters} radios={radios} />
 
           <div className="flex items-center justify-between mb-4">
-            <div className="text-sm text-muted-foreground">{filteredGravacoes.length} gravações encontradas</div>
+            <div className="text-sm text-muted-foreground">{filteredGravacoes.length} gravacoes encontradas</div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={clearFilters} size="sm">Limpar filtros</Button>
               <Button variant="destructive" onClick={handleDeleteSelected} size="sm" disabled={selectedIds.size === 0 || isDeleting}>
@@ -309,11 +322,40 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
             <div className="flex justify-center items-center h-64">
               <Loader className="w-12 h-12 animate-spin text-cyan-400" />
             </div>
+          ) : activeTab === 'live' ? (
+            ongoingGravacoes.length === 0 ? (
+              <div className="card text-center py-12">
+                <XCircle className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                <p className="text-muted-foreground">Nenhuma gravacao em andamento.</p>
+              </div>
+            ) : (
+              <div className="bg-slate-900/80 border border-slate-800 rounded-lg overflow-hidden">
+                {ongoingGravacoes.map((gravacao, idx) => (
+                  <div
+                    key={gravacao.id}
+                    className={`px-4 py-3 flex items-center justify-between ${idx !== ongoingGravacoes.length - 1 ? 'border-b border-slate-800/80' : ''}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <CircleDot className="w-4 h-4 text-red-400 animate-pulse" />
+                      <div className="flex flex-col">
+                        <span className="text-white font-semibold">{gravacao.radios?.nome || 'Radio'}</span>
+                        <span className="text-xs text-slate-400">
+                          Iniciada em {format(new Date(gravacao.criado_em), "d MMM 'as' HH:mm", { locale: ptBR })}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-sm text-slate-300 px-3 py-1 rounded-full bg-slate-800 border border-slate-700">
+                      {gravacao.status === 'gravando' ? 'Gravando' : 'Iniciando'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )
           ) : filteredGravacoes.length === 0 ? (
             <div className="card text-center py-12">
               <XCircle className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <h3 className="text-2xl font-bold text-white mb-2">Nenhuma gravação encontrada</h3>
-              <p className="text-muted-foreground">Ajuste os filtros ou realize novas gravações.</p>
+              <h3 className="text-2xl font-bold text-white mb-2">Nenhuma gravacao encontrada</h3>
+              <p className="text-muted-foreground">Ajuste os filtros ou realize novas gravacoes.</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -325,7 +367,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
                   isPlaying={currentPlayingId === gravacao.id}
                   onPlay={() => handlePlay(gravacao.id)}
                   onStop={handleStop}
-                  setGlobalAudioTrack={setGlobalAudioTrack}
+                  setGlobalAuRadioTrack={setGlobalAuRadioTrack}
                   onDelete={handleDeleteLocal}
                   isSelected={selectedIds.has(gravacao.id)}
                   onToggleSelection={toggleSelection}
@@ -340,4 +382,3 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 };
 
 export default Gravacoes;
-
