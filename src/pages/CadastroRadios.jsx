@@ -532,40 +532,39 @@ const CadastroRadios = () => {
                             {(radio.output_format || 'mp3').toUpperCase()}
                           </span>
                         </div>
-                        <div className="flex flex-wrap gap-2 items-center">
-                          <Button size="sm" variant="outline" onClick={() => handleEdit(radio)}>
-                            <Edit className="w-4 h-4 mr-2" /> Editar
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button size="sm" variant="outline" onClick={() => handleEdit(radio)} className="h-8 text-xs">
+                            <Edit className="w-3 h-3 mr-1" /> Editar
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="text-destructive"
+                            className="text-destructive h-8 text-xs"
                             onClick={() => handleDelete(radio.id)}
                           >
-                            <Trash2 className="w-4 h-4 mr-2" /> Excluir
+                            <Trash2 className="w-3 h-3 mr-1" /> Excluir
                           </Button>
                           <Button
                             size="sm"
                             variant={recordPanelRadioId === radio.id ? 'default' : 'outline'}
                             onClick={() => toggleRecordPanel(radio.id)}
-                            className="flex items-center gap-2"
+                            className="flex items-center gap-1 h-8 text-xs"
                           >
-                            <CircleDot className="w-4 h-4 text-red-400" />
+                            <CircleDot className="w-3 h-3 text-red-400" />
                             Gravar
                           </Button>
-                          <div className="flex-1" />
                           <Button
                             size="sm"
                             onClick={() => handlePlayPause(radio)}
-                            className="ml-auto flex items-center gap-2"
+                            className="flex items-center gap-1 h-8 text-xs"
                           >
                             {isPlaying(radio.id) ? (
                               <>
-                                <Pause className="w-4 h-4" /> Pausar
+                                <Pause className="w-3 h-3" /> Pausar
                               </>
                             ) : (
                               <>
-                                <Play className="w-4 h-4" />{' '}
+                                <Play className="w-3 h-3" />
                                 {isBuffering && currentRadioId === radio.id ? 'Carregando...' : 'Ouvir'}
                               </>
                             )}
