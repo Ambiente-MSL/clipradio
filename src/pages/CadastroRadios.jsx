@@ -263,6 +263,15 @@ const CadastroRadios = () => {
         title: 'Gravacao iniciada',
         description: `${radio.nome} por ${recordDuration} minutos.`,
       })
+      window.dispatchEvent(new CustomEvent('recording-started', {
+        detail: {
+          id: gravacao.id,
+          radioNome: radio.nome,
+          duracao: recordDuration,
+          startedAt: new Date().toISOString(),
+          status: 'iniciando',
+        },
+      }))
       setRecordPanelRadioId(null)
     } catch (error) {
       toast({
@@ -544,6 +553,7 @@ const CadastroRadios = () => {
                             <CircleDot className="w-4 h-4 text-red-400" />
                             Gravar
                           </Button>
+                          <div className="flex-1" />
                           <Button
                             size="sm"
                             onClick={() => handlePlayPause(radio)}
