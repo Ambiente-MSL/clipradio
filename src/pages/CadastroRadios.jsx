@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Radio, Globe, Plus, Edit, Trash2, Star, StarOff, Loader, MapPin, Play, Pause, CheckCircle, AlertCircle, LayoutGrid, List, CircleDot } from 'lucide-react'
+import { Radio, Globe, Plus, Edit, Trash2, Star, StarOff, Loader, MapPin, Play, Pause, CheckCircle, AlertCircle, LayoutGrid, List, CircleDot, Clock } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 import { Button } from '@/components/ui/button'
 import apiClient from '@/lib/apiClient'
@@ -41,10 +41,15 @@ const CadastroRadios = () => {
   const fetchRadios = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await apiClient.getRadios()
-      setRadios(data || [])
+      const [radiosData, agData] = await Promise.all([
+        apiClient.getRadios(),
+        apiClient.getAgendamentos().catch(() => []),
+      ])
+      setRadios(radiosData || [])
+      const agSet = new Set((agData || []).map((ag) => ag.radio_id))
+      setScheduledRadioIds(agSet)
     } catch (error) {
-      toast({ title: 'Erro ao buscar rádios', description: error.message, variant: 'destructive' })
+      toast({ title: 'Erro ao buscar r?dios', description: error.message, variant: 'destructive' })
     }
     setLoading(false)
   }, [toast])
@@ -515,16 +520,21 @@ const CadastroRadios = () => {
                           </Button>
                         </div>
                         <div className="flex items-center gap-4 text-sm text-slate-400">
-                          <span className="flex items-center gap-1">
-                            <Globe className="w-4 h-4" />
-                            {radio.cidade || '--'}
+                        <span className="flex items-center gap-1">
+                          <Globe className="w-4 h-4" />
+                          {radio.cidade || '--'}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-4 h-4" />
+                          {radio.estado || '--'}
+                        </span>
+                        {scheduledRadioIds.has(radio.id) && (
+                          <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 text-[11px] font-semibold">
+                            <Clock className="w-3 h-3" /> Agendado
                           </span>
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-4 h-4" />
-                            {radio.estado || '--'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-300">
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-slate-300">
                           <span className="px-2 py-1 rounded-full bg-slate-800/80 border border-slate-700">
                             {radio.bitrate_kbps || 128} kbps
                           </span>
@@ -627,6 +637,11 @@ const CadastroRadios = () => {
                               <MapPin className="w-3 h-3" />
                               {radio.estado || '--'}
                             </span>
+                            {scheduledRadioIds.has(radio.id) && (
+                              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 text-[11px] font-semibold">
+                                <Clock className="w-3 h-3" /> Agendado
+                              </span>
+                            )}
                             <span className="px-2 py-0.5 rounded-full bg-slate-800/80 border border-slate-700">
                               {radio.bitrate_kbps || 128} kbps
                             </span>
