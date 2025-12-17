@@ -29,7 +29,7 @@ const GravacoesStats = ({ stats }) => (
     <StatCard icon={<Mic className="w-12 h-12 text-primary mb-3" />} value={stats.totalGravacoes} unit="Gravações" delay={0.1} />
     <StatCard icon={<Clock className="w-12 h-12 text-blue-400 mb-3" />} value={(stats.totalDuration / 3600).toFixed(1)} unit="Horas Totais" delay={0.2} />
     <StatCard icon={<FileArchive className="w-12 h-12 text-green-400 mb-3" />} value={(stats.totalSize / 1024).toFixed(1)} unit="GB Totais" delay={0.3} />
-    <StatCard icon={<Mic className="w-12 h-12 text-destructive mb-3" />} value={stats.uniqueradios} unit="RáRadios Gravadas" delay={0.4} />
+    <StatCard icon={<Mic className="w-12 h-12 text-destructive mb-3" />} value={stats.uniqueRadios || stats.uniqueradios || 0} unit="RáRadios Gravadas" delay={0.4} />
   </div>
 );
 
@@ -187,7 +187,7 @@ const Gravacoes = ({ setGlobalAuRadioTrack }) => {
   const [gravacoes, setGravacoes] = useState([]);
   const [radios, setradios] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ totalGravacoes: 0, totalDuration: 0, totalSize: 0, uniqueradios: 0 });
+  const [stats, setStats] = useState({ totalGravacoes: 0, totalDuration: 0, totalSize: 0, uniqueRadios: 0 });
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const initialRaRadioId = searchParams.get('raRadioId') || 'all';
@@ -219,7 +219,7 @@ const Gravacoes = ({ setGlobalAuRadioTrack }) => {
       });
       setGravacoes(data || []);
       const statsData = await apiClient.getGravacoesStats();
-      setStats(statsData || { totalGravacoes: 0, totalDuration: 0, totalSize: 0, uniqueradios: 0 });
+      setStats(statsData || { totalGravacoes: 0, totalDuration: 0, totalSize: 0, uniqueRadios: 0 });
     } catch (error) {
       toast({ title: 'Erro ao buscar gravações', description: error.message, variant: 'destructive' });
     }

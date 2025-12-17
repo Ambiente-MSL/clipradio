@@ -23,15 +23,6 @@ const Navbar = () => {
   const [showRecordingPanel, setShowRecordingPanel] = useState(false);
   const [ongoingRecords, setOngoingRecords] = useState([]);
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/login');
-  };
-
-  if (!user) {
-    return null;
-  }
-
   const getNavLinkClass = (path) => {
     const baseClass = 'flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all duration-300';
     const activeClass = 'bg-cyan-500/10 text-cyan-400';
@@ -61,6 +52,15 @@ const Navbar = () => {
     window.addEventListener('recording-started', handler);
     return () => window.removeEventListener('recording-started', handler);
   }, []);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
+  };
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <motion.header
