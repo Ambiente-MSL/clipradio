@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Radio, Globe, Plus, Edit, Trash2, Star, StarOff, Loader, MapPin, Play, Pause, CheckCircle, AlertCircle } from 'lucide-react'
+import { Radio, Globe, Plus, Edit, Trash2, Star, StarOff, Loader, MapPin, Play, Pause, CheckCircle, AlertCircle, LayoutGrid, List } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 import { Button } from '@/components/ui/button'
 import apiClient from '@/lib/apiClient'
@@ -24,6 +24,7 @@ const CadastroRadios = () => {
   const [currentRadioId, setCurrentRadioId] = useState(null)
   const [isBuffering, setIsBuffering] = useState(false)
   const [streamStatus, setStreamStatus] = useState({ state: 'idle', message: '' })
+  const [viewMode, setViewMode] = useState('card')
   const audioRef = useRef(null)
   const validationAudioRef = useRef(null)
   const { toast } = useToast()
@@ -383,7 +384,27 @@ const CadastroRadios = () => {
                   <Radio className="w-6 h-6 mr-3 text-cyan-400" />
                   Rádios Cadastradas
                 </CardTitle>
-                <span className="text-sm text-slate-400">Total: {radios.length}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-slate-400">Total: {radios.length}</span>
+                  <div className="flex gap-1 p-1 bg-slate-900/60 rounded-md border border-slate-700">
+                    <Button
+                      size="sm"
+                      variant={viewMode === 'card' ? 'default' : 'ghost'}
+                      onClick={() => setViewMode('card')}
+                      className={`px-3 h-8 ${viewMode === 'card' ? 'bg-cyan-500 hover:bg-cyan-600' : ''}`}
+                    >
+                      <LayoutGrid className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={viewMode === 'list' ? 'default' : 'ghost'}
+                      onClick={() => setViewMode('list')}
+                      className={`px-3 h-8 ${viewMode === 'list' ? 'bg-cyan-500 hover:bg-cyan-600' : ''}`}
+                    >
+                      <List className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 {loading ? (
@@ -392,7 +413,7 @@ const CadastroRadios = () => {
                   </div>
                 ) : radios.length === 0 ? (
                   <div className="text-center py-12 text-slate-400">Nenhuma rádio cadastrada ainda.</div>
-                ) : (
+                ) : viewMode === 'card' ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {radios.map((radio) => (
                       <div
@@ -456,6 +477,75 @@ const CadastroRadios = () => {
                               <>
                                 <Play className="w-4 h-4" />{' '}
                                 {isBuffering && currentRadioId === radio.id ? 'Carregando...' : 'Ouvir'}
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {radios.map((radio) => (
+                      <div
+                        key={radio.id}
+                        className="p-3 bg-slate-900/40 border border-slate-800 rounded-lg flex items-center gap-3"
+                      >
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => toggleFavorite(radio)}
+                          className="text-yellow-400 flex-shrink-0"
+                        >
+                          {radio.favorita ? <Star className="w-5 h-5" /> : <StarOff className="w-5 h-5" />}
+                        </Button>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-base font-semibold text-white truncate">{radio.nome}</h3>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mt-1">
+                            <span className="flex items-center gap-1">
+                              <Globe className="w-3 h-3" />
+                              {radio.cidade || '--'}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {radio.estado || '--'}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full bg-slate-800/80 border border-slate-700">
+                              {radio.bitrate_kbps || 128} kbps
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full bg-slate-800/80 border border-slate-700">
+                              {(radio.output_format || 'mp3').toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button size="sm" variant="outline" onClick={() => handleEdit(radio)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive"
+                            onClick={() => handleDelete(radio.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handlePlayPause(radio)}
+                            className="flex items-center gap-1"
+                          >
+                            {isPlaying(radio.id) ? (
+                              <>
+                                <Pause className="w-4 h-4" />
+                                <span className="hidden sm:inline">Pausar</span>
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-4 h-4" />
+                                <span className="hidden sm:inline">
+                                  {isBuffering && currentRadioId === radio.id ? 'Carregando...' : 'Ouvir'}
+                                </span>
                               </>
                             )}
                           </Button>
