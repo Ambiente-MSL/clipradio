@@ -326,7 +326,7 @@ const CadastroRadios = () => {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm text-slate-400 mb-1">Bitrate da gravaÇõÇœo</label>
+                      <label className="block text-sm text-slate-400 mb-1">Bitrate da gravação</label>
                       <select
                         value={formData.bitrate_kbps}
                         onChange={(e) => setFormData({ ...formData, bitrate_kbps: Number(e.target.value) })}
