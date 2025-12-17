@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import apiClient from '@/lib/apiClient';
-import { useToast } from '@/components/ui/use-toast';
-import { Helmet } from 'react-helmet';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Play, Pause, Download, Trash2, Clock, FileArchive, Mic, Filter, ListFilter, CalendarDays, MapPin, XCircle, Loader } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useToast } from '@/components/ui/use-toast';
+import { Helmet } from 'react-helmet';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Play, Pause, Download, Trash2, Clock, FileArchive, Mic, Filter, ListFilter, CalendarDays, MapPin, XCircle, Loader } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 const StatCard = ({ icon, value, unit, delay }) => (
   <motion.div 
@@ -183,10 +183,11 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 };
 
 const Gravacoes = ({ setGlobalAudioTrack }) => {
-  const [gravacoes, setGravacoes] = useState([]);
-  const [radios, setRadios] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ totalGravacoes: 0, totalDuration: 0, totalSize: 0, uniqueRadios: 0 });
+  const [gravacoes, setGravacoes] = useState([]);
+  const [agendamentos, setAgendamentos] = useState([]);
+  const [radios, setRadios] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ totalGravacoes: 0, totalDuration: 0, totalSize: 0, uniqueRadios: 0 });
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const initialRadioId = searchParams.get('radioId') || 'all';
@@ -209,21 +210,26 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
   const fetchGravacoes = useCallback(async () => {
     setLoading(true);
-    try {
-      const data = await apiClient.getGravacoes({
-        radioId: filters.radioId !== 'all' ? filters.radioId : undefined,
-        data: filters.data,
-        cidade: filters.cidade,
-        estado: filters.estado,
-      });
-      setGravacoes(data || []);
-      const statsData = await apiClient.getGravacoesStats();
-      setStats(statsData || { totalGravacoes: 0, totalDuration: 0, totalSize: 0, uniqueRadios: 0 });
-    } catch (error) {
-      toast({ title: 'Erro ao buscar gravações', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  }, [filters, toast]);
+    try {
+      const [gravData, agData] = await Promise.all([
+        apiClient.getGravacoes({
+          radioId: filters.radioId !== 'all' ? filters.radioId : undefined,
+          data: filters.data,
+          cidade: filters.cidade,
+          estado: filters.estado,
+        }),
+        apiClient.getAgendamentos().catch(() => []),
+        apiClient.getGravacoesStats(),
+      ]);
+      const statsData = gravData?.stats || (await apiClient.getGravacoesStats().catch(() => null));
+      setGravacoes(gravData || []);
+      setAgendamentos(agData || []);
+      setStats(statsData || { totalGravacoes: 0, totalDuration: 0, totalSize: 0, uniqueRadios: 0 });
+    } catch (error) {
+      toast({ title: 'Erro ao buscar gravações', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  }, [filters, toast]);
 
   useEffect(() => {
     fetchRadios();
@@ -277,7 +283,21 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
   const clearFilters = () => setFilters({ radioId: 'all', data: '', cidade: '', estado: '' });
 
-  const filteredGravacoes = useMemo(() => gravacoes, [gravacoes]);
+  const agAsGravacoes = useMemo(() => {
+    return agendamentos.map((ag) => ({
+      id: `ag-${ag.id}`,
+      radio_id: ag.radio_id,
+      radios: radios.find((r) => r.id === ag.radio_id),
+      criado_em: ag.data_inicio,
+      status: ag.status || 'agendado',
+      duracao_segundos: (ag.duracao_minutos || 0) * 60,
+      tamanho_mb: 0,
+      tipo: 'agendado',
+      arquivo_url: null,
+    }));
+  }, [agendamentos, radios]);
+
+  const filteredGravacoes = useMemo(() => [...agAsGravacoes, ...gravacoes], [agAsGravacoes, gravacoes]);
   const ongoingGravacoes = useMemo(
     () => filteredGravacoes.filter((g) => ['gravando', 'iniciando', 'processando'].includes(g.status)),
     [filteredGravacoes]
