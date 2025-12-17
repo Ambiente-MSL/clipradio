@@ -29,6 +29,15 @@ const CadastroRadios = () => {
   const [recordPanelRadioId, setRecordPanelRadioId] = useState(null)
   const [recordDuration, setRecordDuration] = useState(15)
   const [startingRecording, setStartingRecording] = useState(false)
+  const [recordStartTime, setRecordStartTime] = useState('')
+  const [recordEndTime, setRecordEndTime] = useState('')
+  const [recordDate, setRecordDate] = useState(() => {
+    const today = new Date()
+    const month = String(today.getMonth() + 1).padStart(2, '0')
+    const day = String(today.getDate()).padStart(2, '0')
+    return `${today.getFullYear()}-${month}-${day}`
+  })
+  const [recordRecurrence, setRecordRecurrence] = useState('once')
   const [activeRecordingId, setActiveRecordingId] = useState(null)
   const audioRef = useRef(null)
   const validationAudioRef = useRef(null)
@@ -251,16 +260,41 @@ const CadastroRadios = () => {
     } else {
       setRecordPanelRadioId(radioId)
       setRecordDuration(15)
+      setRecordStartTime('')
+      setRecordEndTime('')
+      const today = new Date()
+      const month = String(today.getMonth() + 1).padStart(2, '0')
+      const day = String(today.getDate()).padStart(2, '0')
+      setRecordDate(`${today.getFullYear()}-${month}-${day}`)
+      setRecordRecurrence('once')
     }
   }
 
   const handleStartRecording = async (radio) => {
     if (!radio?.id) return
+    const computeDurationMinutes = () => {
+      if (recordStartTime && recordEndTime) {
+        const [sh, sm] = recordStartTime.split(':').map(Number)
+        const [eh, em] = recordEndTime.split(':').map(Number)
+        const start = sh * 60 + sm
+        const end = eh * 60 + em
+        const diff = end - start
+        return diff > 0 ? diff : null
+      }
+      return recordDuration
+    }
+
+    const plannedDuration = computeDurationMinutes()
+    if (!plannedDuration || plannedDuration <= 0) {
+      toast({ title: 'Horário inválido', description: 'Defina hora de início e fim válidas.', variant: 'destructive' })
+      return
+    }
+
     setStartingRecording(true)
     try {
       const gravacao = await apiClient.createGravacao({
         radio_id: radio.id,
-        duracao_minutos: recordDuration,
+        duracao_minutos: plannedDuration,
         status: 'iniciando',
         tipo: 'manual',
       })
@@ -268,13 +302,13 @@ const CadastroRadios = () => {
       await apiClient.startRecording(gravacao.id)
       toast({
         title: 'Gravacao iniciada',
-        description: `${radio.nome} por ${recordDuration} minutos.`,
+        description: `${radio.nome} por ${plannedDuration} minutos.`,
       })
       window.dispatchEvent(new CustomEvent('recording-started', {
         detail: {
           id: gravacao.id,
           radioNome: radio.nome,
-          duracao: recordDuration,
+          duracao: plannedDuration,
           startedAt: new Date().toISOString(),
           status: 'iniciando',
         },
@@ -282,7 +316,7 @@ const CadastroRadios = () => {
       setActiveRecordingId(radio.id)
       setTimeout(() => {
         setActiveRecordingId((current) => current === radio.id ? null : current)
-      }, recordDuration * 60 * 1000 + 60000)
+      }, plannedDuration * 60 * 1000 + 60000)
       setRecordPanelRadioId(null)
     } catch (error) {
       toast({
@@ -518,9 +552,8 @@ const CadastroRadios = () => {
                               <div className="flex items-center gap-2 mb-1">
                                 <h3 className="text-base font-bold text-white truncate">{radio.nome}</h3>
                                 {activeRecordingId === radio.id && (
-                                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/40">
-                                    <CircleDot className="w-2.5 h-2.5 text-red-400 animate-pulse" />
-                                    <span className="text-[10px] font-bold text-red-300 uppercase tracking-wide">Rec</span>
+                                  <span className="text-[10px] font-bold text-red-300 uppercase tracking-wide animate-pulse">
+                                    Gravando
                                   </span>
                                 )}
                               </div>
@@ -628,42 +661,85 @@ const CadastroRadios = () => {
                           </div>
                         </div>
 
-                        {/* Painel de gravação */}
+                        {/* Painel de gravacao */}
                         {recordPanelRadioId === radio.id && (
-                          <div className="px-4 pb-4 border-t border-slate-800/50 pt-3 bg-slate-950/40">
-                            <div className="space-y-3">
-                              <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
-                                <span>Duração</span>
-                                <span className="text-cyan-400 font-bold">{recordDuration} min</span>
+                          <div className='px-4 pb-4 border-t border-slate-800/50 pt-3 bg-slate-950/40'>
+                            <div className='space-y-4'>
+                              <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-200'>
+                                <div className='flex flex-col gap-1'>
+                                  <span className='font-semibold text-slate-100'>Hora de Inicio</span>
+                                  <input
+                                    type='time'
+                                    value={recordStartTime}
+                                    onChange={(e) => setRecordStartTime(e.target.value)}
+                                    className='bg-slate-800/80 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500'
+                                  />
+                                </div>
+                                <div className='flex flex-col gap-1'>
+                                  <span className='font-semibold text-slate-100'>Hora de Fim</span>
+                                  <input
+                                    type='time'
+                                    value={recordEndTime}
+                                    onChange={(e) => setRecordEndTime(e.target.value)}
+                                    className='bg-slate-800/80 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500'
+                                  />
+                                </div>
                               </div>
-                              <input
-                                type="range"
-                                min="1"
-                                max="60"
-                                step="1"
-                                value={recordDuration}
-                                onChange={(e) => setRecordDuration(Number(e.target.value))}
-                                className="record-slider w-full"
-                              />
-                              <div className="flex items-center justify-between text-[10px] text-slate-500">
-                                <span>1 min</span>
-                                <span>60 min</span>
+                              <div className='flex flex-col gap-1 text-sm text-slate-200'>
+                                <span className='font-semibold text-slate-100'>Recorrencia</span>
+                                <select
+                                  value={recordRecurrence}
+                                  onChange={(e) => setRecordRecurrence(e.target.value)}
+                                  className='bg-slate-800/80 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500'
+                                >
+                                  <option value='once'>Gravacao Unica</option>
+                                  <option value='daily'>Diaria</option>
+                                  <option value='weekly'>Semanal</option>
+                                </select>
+                              </div>
+                              <div className='flex flex-col gap-1 text-sm text-slate-200'>
+                                <span className='font-semibold text-slate-100'>Data da Gravacao</span>
+                                <input
+                                  type='date'
+                                  value={recordDate}
+                                  onChange={(e) => setRecordDate(e.target.value)}
+                                  className='bg-slate-800/80 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500'
+                                />
+                              </div>
+                              <div className='space-y-2'>
+                                <div className='flex items-center justify-between text-xs text-slate-400 font-medium'>
+                                  <span>Duracao</span>
+                                  <span className='text-cyan-400 font-bold'>{recordDuration} min</span>
+                                </div>
+                                <input
+                                  type='range'
+                                  min='1'
+                                  max='60'
+                                  step='1'
+                                  value={recordDuration}
+                                  onChange={(e) => setRecordDuration(Number(e.target.value))}
+                                  className='record-slider w-full'
+                                />
+                                <div className='flex items-center justify-between text-[10px] text-slate-500'>
+                                  <span>1 min</span>
+                                  <span>60 min</span>
+                                </div>
                               </div>
                               <Button
-                                size="sm"
+                                size='sm'
                                 disabled={startingRecording}
                                 onClick={() => handleStartRecording(radio)}
-                                className="w-full h-9 bg-red-500 hover:bg-red-600 text-white font-semibold"
+                                className='w-full h-9 bg-red-500 hover:bg-red-600 text-white font-semibold'
                               >
                                 {startingRecording ? (
                                   <>
-                                    <Loader className="w-3.5 h-3.5 mr-2 animate-spin" />
+                                    <Loader className='w-3.5 h-3.5 mr-2 animate-spin' />
                                     Iniciando...
                                   </>
                                 ) : (
                                   <>
-                                    <CircleDot className="w-3.5 h-3.5 mr-2" />
-                                    Iniciar Gravação
+                                    <CircleDot className='w-3.5 h-3.5 mr-2' />
+                                    Iniciar Gravacao
                                   </>
                                 )}
                               </Button>
