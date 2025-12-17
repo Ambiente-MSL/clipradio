@@ -9,7 +9,7 @@ import { Helmet } from 'react-helmet';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Play, Pause, Download, Trash2, Clock, FileArchive, Mic, Filter, ListFilter, CalendarDays, MapPin, XCircle, Loader } from 'lucide-react';
+import { Play, Pause, Download, Trash2, Clock, FileArchive, Mic, Filter, ListFilter, CalendarDays, MapPin, XCircle, Loader, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -381,6 +381,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [activeTab, setActiveTab] = useState('all');
+  const [stoppingId, setStoppingId] = useState(null);
 
   const { toast } = useToast();
 
@@ -449,6 +450,32 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
   const handlePlay = (id) => setCurrentPlayingId(id);
 
   const handleStop = () => setCurrentPlayingId(null);
+
+  const handleStopRecording = async (gravacao) => {
+    if (!gravacao?.id) return;
+    const idStr = String(gravacao.id);
+    if (idStr.startsWith('ag-')) {
+      toast({ title: 'Nao e possivel parar', description: 'Agendamentos nao podem ser parados manualmente.', variant: 'destructive' });
+      return;
+    }
+    if (!['gravando', 'iniciando', 'processando'].includes(gravacao.status)) {
+      toast({ title: 'Gravacao nao esta em andamento', description: 'Apenas gravacoes ativas podem ser paradas.', variant: 'destructive' });
+      return;
+    }
+    setStoppingId(gravacao.id);
+    try {
+      await apiClient.stopRecording(gravacao.id);
+      toast({ title: 'Gravacao parada', description: `${gravacao.radios?.nome || 'Gravacao'} foi interrompida.` });
+      setGravacoes((prev) =>
+        prev.map((g) => (g.id === gravacao.id ? { ...g, status: 'concluido' } : g))
+      );
+      fetchGravacoes();
+    } catch (error) {
+      toast({ title: 'Erro ao parar', description: error.message, variant: 'destructive' });
+    } finally {
+      setStoppingId(null);
+    }
+  };
 
 
 
@@ -654,13 +681,9 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
                 {ongoingGravacoes.map((gravacao, idx) => (
 
                   <div
-
                     key={gravacao.id}
-
                     className={`px-4 py-3 flex items-center justify-between ${idx !== ongoingGravacoes.length - 1 ? 'border-b border-slate-800/80' : ''}`}
-
                   >
-
                     <div className="flex items-center gap-3">
                       <div className="flex flex-col">
                         <span className="text-white font-semibold">{gravacao.radios?.nome || 'Radio'}</span>
@@ -669,10 +692,36 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
                         </span>
                       </div>
                     </div>
-                    <span className={`text-sm px-3 py-1 rounded-full border ${gravacao.status === 'iniciando' ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-200 animate-pulse' : 'bg-red-500/15 border-red-500/40 text-red-200 animate-pulse'}`}>
-                      {gravacao.status === 'iniciando' ? 'Iniciando' : 'Gravando'}
-                    </span>
-
+                    <div className="flex items-center gap-3">
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="h-8 px-3"
+                        onClick={() => handleStopRecording(gravacao)}
+                        disabled={stoppingId === gravacao.id}
+                      >
+                        {stoppingId === gravacao.id ? (
+                          <>
+                            <Loader className="w-3.5 h-3.5 mr-1 animate-spin" />
+                            Parando...
+                          </>
+                        ) : (
+                          <>
+                            <Square className="w-3.5 h-3.5 mr-1" />
+                            Parar
+                          </>
+                        )}
+                      </Button>
+                      <span
+                        className={`text-sm px-3 py-1 rounded-full border ${
+                          gravacao.status === 'iniciando'
+                            ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-200 animate-pulse'
+                            : 'bg-red-500/15 border-red-500/40 text-red-200 animate-pulse'
+                        }`}
+                      >
+                        {gravacao.status === 'iniciando' ? 'Iniciando' : 'Gravando'}
+                      </span>
+                    </div>
                   </div>
 
                 ))}

@@ -27,7 +27,6 @@ const CadastroRadios = () => {
   const [viewMode, setViewMode] = useState('card')
   const [scheduledRadioIds, setScheduledRadioIds] = useState(new Set())
   const [recordPanelRadioId, setRecordPanelRadioId] = useState(null)
-  const [recordDuration, setRecordDuration] = useState(15)
   const [startingRecording, setStartingRecording] = useState(false)
   const [recordStartTime, setRecordStartTime] = useState('')
   const [recordEndTime, setRecordEndTime] = useState('')
@@ -259,7 +258,6 @@ const CadastroRadios = () => {
       setRecordPanelRadioId(null)
     } else {
       setRecordPanelRadioId(radioId)
-      setRecordDuration(15)
       setRecordStartTime('')
       setRecordEndTime('')
       const today = new Date()
@@ -281,12 +279,12 @@ const CadastroRadios = () => {
         const diff = end - start
         return diff > 0 ? diff : null
       }
-      return recordDuration
+      return null
     }
 
     const plannedDuration = computeDurationMinutes()
     if (!plannedDuration || plannedDuration <= 0) {
-      toast({ title: 'Horário inválido', description: 'Defina hora de início e fim válidas.', variant: 'destructive' })
+      toast({ title: 'Horario invalido', description: 'Defina hora de inicio e fim validas.', variant: 'destructive' })
       return
     }
 
@@ -329,36 +327,6 @@ const CadastroRadios = () => {
     }
   }
 
-  const sliderStyle = `
-    .record-slider {
-      appearance: none;
-      width: 100%;
-      height: 2px;
-      background: linear-gradient(to right, #ffffff55, #ffffff22);
-      border-radius: 999px;
-    }
-    .record-slider:focus { outline: none; }
-    .record-slider::-webkit-slider-thumb {
-      appearance: none;
-      width: 18px;
-      height: 18px;
-      border: 2px solid #e5e7eb;
-      background: #0f172a;
-      border-radius: 999px;
-      box-shadow: 0 0 0 2px #0f172a;
-      cursor: pointer;
-    }
-    .record-slider::-moz-range-thumb {
-      width: 18px;
-      height: 18px;
-      border: 2px solid #e5e7eb;
-      background: #0f172a;
-      border-radius: 999px;
-      box-shadow: 0 0 0 2px #0f172a;
-      cursor: pointer;
-    }
-  `
-
   const renderStreamStatusIcon = () => {
     if (streamStatus.state === 'loading') {
       return <Loader className="w-4 h-4 text-cyan-400 animate-spin" />
@@ -374,7 +342,6 @@ const CadastroRadios = () => {
 
   return (
     <div className="min-h-screen p-4 md:p-6">
-      <style>{sliderStyle}</style>
       <div className="max-w-7xl mx-auto">
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold gradient-text mb-2">Gerenciador de Rádios</h1>
@@ -705,25 +672,6 @@ const CadastroRadios = () => {
                                   onChange={(e) => setRecordDate(e.target.value)}
                                   className='bg-slate-800/80 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500'
                                 />
-                              </div>
-                              <div className='space-y-2'>
-                                <div className='flex items-center justify-between text-xs text-slate-400 font-medium'>
-                                  <span>Duracao</span>
-                                  <span className='text-cyan-400 font-bold'>{recordDuration} min</span>
-                                </div>
-                                <input
-                                  type='range'
-                                  min='1'
-                                  max='60'
-                                  step='1'
-                                  value={recordDuration}
-                                  onChange={(e) => setRecordDuration(Number(e.target.value))}
-                                  className='record-slider w-full'
-                                />
-                                <div className='flex items-center justify-between text-[10px] text-slate-500'>
-                                  <span>1 min</span>
-                                  <span>60 min</span>
-                                </div>
                               </div>
                               <Button
                                 size='sm'
