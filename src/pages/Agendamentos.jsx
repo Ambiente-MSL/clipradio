@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Clock, Plus, Edit, Trash2, Power, PowerOff, Loader, AlertCircle, CheckCircle, Repeat } from 'lucide-react';
+import { Calendar, Clock, Plus, Edit, Trash2, Power, PowerOff, Loader, AlertCircle, CheckCircle, Repeat, FileDown } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import apiClient from '@/lib/apiClient';
@@ -17,6 +17,7 @@ const Agendamentos = () => {
   const [loading, setLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -132,6 +133,26 @@ const Agendamentos = () => {
     fetchAgendamentos(); // Atualiza a lista após fechar o modal
   };
 
+  const handleExport = async (format) => {
+    setExportingFormat(format);
+    try {
+      const { blob, filename } = await apiClient.downloadAgendamentosReport(format);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: `Relatório ${format.toUpperCase()} gerado`, description: 'Download iniciado.' });
+    } catch (error) {
+      toast({ title: 'Erro ao gerar relatório', description: error.message, variant: 'destructive' });
+    } finally {
+      setExportingFormat(null);
+    }
+  };
+
   return (
     <>
       <Helmet>
@@ -145,10 +166,30 @@ const Agendamentos = () => {
               <h1 className="text-4xl font-bold gradient-text mb-2">Agendamentos</h1>
               <p className="text-slate-400 text-lg">Configure gravações recorrentes para suas rádios</p>
             </div>
-            <Button onClick={handleAddNew} className="btn btn-primary">
-              <Plus className="w-5 h-5 mr-2"/>
-              Novo Agendamento
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="border-slate-700 text-slate-100 hover:border-cyan-400"
+                onClick={() => handleExport('csv')}
+                disabled={exportingFormat !== null}
+              >
+                <FileDown className="w-4 h-4 mr-2" />
+                {exportingFormat === 'csv' ? 'Gerando...' : 'CSV'}
+              </Button>
+              <Button
+                variant="outline"
+                className="border-slate-700 text-slate-100 hover:border-cyan-400"
+                onClick={() => handleExport('pdf')}
+                disabled={exportingFormat !== null}
+              >
+                <FileDown className="w-4 h-4 mr-2" />
+                {exportingFormat === 'pdf' ? 'Gerando...' : 'PDF'}
+              </Button>
+              <Button onClick={handleAddNew} className="btn btn-primary">
+                <Plus className="w-5 h-5 mr-2"/>
+                Novo Agendamento
+              </Button>
+            </div>
           </motion.div>
 
           <div className="grid grid-cols-1">

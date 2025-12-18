@@ -185,6 +185,24 @@ class ApiClient {
     });
   }
 
+  async downloadAgendamentosReport(format = 'csv') {
+    const url = `${this.baseURL}/agendamentos/report?format=${format}`;
+    const headers = {};
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+    const response = await fetch(url, { headers });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `Falha ao gerar relatório (${response.status})`);
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const match = disposition.match(/filename="?(.+?)"?$/i);
+    const filename = match ? match[1] : `agendamentos.${format}`;
+    return { blob, filename };
+  }
+
   // ============ TAGS ============
   async getTags() {
     return this.request('/tags');
