@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader, Save, Clock, Repeat, Radio as RadioIcon } from 'lucide-react';
+import { Loader, Save, Clock, Repeat, Radio as RadioIcon, MapPin } from 'lucide-react';
 import apiClient from '@/lib/apiClient';
 
-const AgendamentoForm = ({ agendamentoIdParam }) => {
+const AgendamentoForm = ({ agendamentoIdParam, onSuccess }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -18,6 +18,7 @@ const AgendamentoForm = ({ agendamentoIdParam }) => {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [selectedCidade, setSelectedCidade] = useState('');
 
   const [formData, setFormData] = useState({
     radio_id: '',
@@ -38,6 +39,23 @@ const AgendamentoForm = ({ agendamentoIdParam }) => {
     { id: 0, label: 'Domingo' },
   ];
 
+  // Extrair cidades únicas das rádios
+  const cidades = useMemo(() => {
+    const cidadesSet = new Set();
+    radios.forEach(radio => {
+      if (radio.cidade) {
+        cidadesSet.add(radio.cidade);
+      }
+    });
+    return Array.from(cidadesSet).sort();
+  }, [radios]);
+
+  // Filtrar rádios pela cidade selecionada
+  const radiosFiltradas = useMemo(() => {
+    if (!selectedCidade) return radios;
+    return radios.filter(radio => radio.cidade === selectedCidade);
+  }, [radios, selectedCidade]);
+
   const fetchInitialData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -56,6 +74,12 @@ const AgendamentoForm = ({ agendamentoIdParam }) => {
           const duracao = agendamentoData.duracao_minutos || 60;
           const horaFimDate = new Date(dataInicio.getTime() + duracao * 60000);
           const horaFim = horaFimDate.toISOString().substring(11, 16);
+
+          // Encontrar a cidade da rádio selecionada
+          const radioSelecionada = radioData.find(r => r.id === agendamentoData.radio_id);
+          if (radioSelecionada?.cidade) {
+            setSelectedCidade(radioSelecionada.cidade);
+          }
 
           setFormData({
             radio_id: agendamentoData.radio_id,
@@ -146,7 +170,13 @@ const AgendamentoForm = ({ agendamentoIdParam }) => {
         await apiClient.createAgendamento(payload);
       }
       toast({ title: "Sucesso!", description: `Agendamento ${editingId ? 'atualizado' : 'criado'} com sucesso.` });
-      navigate('/agendamentos');
+
+      // Se existe callback onSuccess (modal), chama ele, senão navega
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        navigate('/agendamentos');
+      }
     } catch (error) {
       toast({ variant: "destructive", title: "Erro ao salvar", description: error.message });
     } finally {
@@ -160,16 +190,48 @@ const AgendamentoForm = ({ agendamentoIdParam }) => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-            <Label htmlFor="radio_id" className="flex items-center gap-2 mb-1"><RadioIcon className="w-4 h-4" /> Rádio</Label>
-            <Select name="radio_id" value={formData.radio_id} onValueChange={v => handleSelectChange('radio_id', v)} disabled={loading || radios.length === 0}>
-                <SelectTrigger id="radio_id"><SelectValue placeholder="Selecione uma rádio..." /></SelectTrigger>
-                <SelectContent>
-                    {radios.map(radio => (
-                        <SelectItem key={radio.id} value={radio.id}>{radio.nome}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <Label htmlFor="cidade" className="flex items-center gap-2 mb-1"><MapPin className="w-4 h-4" /> Cidade</Label>
+                <Select
+                    name="cidade"
+                    value={selectedCidade}
+                    onValueChange={(v) => {
+                        setSelectedCidade(v);
+                        // Limpar a seleção de rádio quando mudar a cidade
+                        setFormData(prev => ({ ...prev, radio_id: '' }));
+                    }}
+                    disabled={loading || cidades.length === 0}
+                >
+                    <SelectTrigger id="cidade">
+                        <SelectValue placeholder="Selecione uma cidade..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {cidades.map(cidade => (
+                            <SelectItem key={cidade} value={cidade}>{cidade}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <div>
+                <Label htmlFor="radio_id" className="flex items-center gap-2 mb-1"><RadioIcon className="w-4 h-4" /> Rádio</Label>
+                <Select
+                    name="radio_id"
+                    value={formData.radio_id}
+                    onValueChange={v => handleSelectChange('radio_id', v)}
+                    disabled={loading || !selectedCidade || radiosFiltradas.length === 0}
+                >
+                    <SelectTrigger id="radio_id">
+                        <SelectValue placeholder={!selectedCidade ? "Selecione uma cidade primeiro" : "Selecione uma rádio..."} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {radiosFiltradas.map(radio => (
+                            <SelectItem key={radio.id} value={radio.id}>{radio.nome}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -8,12 +8,15 @@ import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatInTimeZone } from 'date-fns-tz';
+import AgendamentoForm from '@/components/AgendamentoForm';
 
 const Agendamentos = () => {
   const [agendamentos, setAgendamentos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -121,7 +124,12 @@ const Agendamentos = () => {
   };
   
   const handleAddNew = () => {
-    navigate('/novo-agendamento');
+    setIsModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    fetchAgendamentos(); // Atualiza a lista após fechar o modal
   };
 
   return (
@@ -208,6 +216,19 @@ const Agendamentos = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal de Novo Agendamento */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-800/95 border-slate-700/60 backdrop-blur-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-white text-xl">
+              <Calendar className="w-6 h-6 mr-3 text-cyan-400" />
+              Criar Novo Agendamento
+            </DialogTitle>
+          </DialogHeader>
+          <AgendamentoForm onSuccess={handleModalClose} />
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
