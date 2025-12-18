@@ -15,25 +15,27 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 
-const StatCard = ({ icon, value, unit, delay }) => (
+const StatCard = ({ icon, value, unit, delay, gradient }) => (
 
-  <motion.div 
+  <motion.div
 
-    initial={{ opacity: 0, scale: 0.9 }} 
+    initial={{ opacity: 0, scale: 0.9 }}
 
-    animate={{ opacity: 1, scale: 1 }} 
+    animate={{ opacity: 1, scale: 1 }}
 
-    transition={{ delay }} 
+    transition={{ delay }}
 
-    className="card flex flex-col items-center justify-center p-6 text-center"
+    className={`relative overflow-hidden rounded-xl border border-slate-800 bg-gradient-to-br ${gradient} p-6 shadow-xl flex flex-col items-center justify-center text-center`}
 
   >
 
     {icon}
 
-    <span className="text-4xl font-bold text-foreground">{value}</span>
+    <span className="text-4xl font-bold text-white">{value}</span>
 
-    <span className="text-muted-foreground text-sm">{unit}</span>
+    <span className="text-slate-300 text-sm">{unit}</span>
+
+    <div className="absolute inset-0 pointer-events-none bg-gradient-to-tr from-white/5 via-transparent to-transparent" />
 
   </motion.div>
 
@@ -45,13 +47,13 @@ const GravacoesStats = ({ stats }) => (
 
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
 
-    <StatCard icon={<Mic className="w-12 h-12 text-primary mb-3" />} value={stats.totalGravacoes} unit="Gravações" delay={0.1} />
+    <StatCard icon={<Mic className="w-12 h-12 text-cyan-300 mb-3" />} value={stats.totalGravacoes} unit="Gravações" delay={0.1} gradient="from-cyan-600/50 via-cyan-500/30 to-slate-900" />
 
-    <StatCard icon={<Clock className="w-12 h-12 text-blue-400 mb-3" />} value={(stats.totalDuration / 3600).toFixed(1)} unit="Horas Totais" delay={0.2} />
+    <StatCard icon={<Clock className="w-12 h-12 text-emerald-300 mb-3" />} value={(stats.totalDuration / 3600).toFixed(1)} unit="Horas Totais" delay={0.2} gradient="from-emerald-600/50 via-emerald-500/30 to-slate-900" />
 
-    <StatCard icon={<FileArchive className="w-12 h-12 text-green-400 mb-3" />} value={(stats.totalSize / 1024).toFixed(1)} unit="GB Totais" delay={0.3} />
+    <StatCard icon={<FileArchive className="w-12 h-12 text-amber-300 mb-3" />} value={(stats.totalSize / 1024).toFixed(1)} unit="GB Totais" delay={0.3} gradient="from-amber-600/40 via-amber-500/20 to-slate-900" />
 
-    <StatCard icon={<Mic className="w-12 h-12 text-destructive mb-3" />} value={stats.uniqueRadios || stats.uniqueradios || 0} unit="Rádios gravadas" delay={0.4} />
+    <StatCard icon={<Mic className="w-12 h-12 text-fuchsia-300 mb-3" />} value={stats.uniqueRadios || stats.uniqueradios || 0} unit="Rádios gravadas" delay={0.4} gradient="from-fuchsia-600/40 via-fuchsia-500/20 to-slate-900" />
 
   </div>
 

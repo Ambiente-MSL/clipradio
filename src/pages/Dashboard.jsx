@@ -153,23 +153,27 @@ const Dashboard = () => {
     return null;
   };
 
-  const StatCard = ({ icon, title, value, loading, colorClass, onNavigate }) => (
+  const StatCard = ({ icon, title, value, loading, gradient, iconColor, onNavigate }) => (
     <motion.div whileHover={{ scale: 1.05 }} transition={{ type: 'spring', stiffness: 300 }}>
-      <Card className="glass-effect overflow-hidden cursor-pointer" onClick={onNavigate}>
-        <CardContent className="p-5 flex items-center justify-between">
+      <div
+        className={`relative overflow-hidden rounded-xl border border-slate-800 bg-gradient-to-br ${gradient} p-5 shadow-xl cursor-pointer`}
+        onClick={onNavigate}
+      >
+        <div className="flex items-center justify-between">
           <div>
-            <p className="text-md text-muted-foreground font-medium">{title}</p>
+            <p className="text-slate-300 text-sm">{title}</p>
             {loading ? (
-              <Loader className="w-8 h-8 animate-spin mt-1 text-primary" />
+              <Loader className="w-8 h-8 animate-spin mt-1 text-cyan-400" />
             ) : (
-              <p className="text-4xl font-bold text-foreground">{value}</p>
+              <p className="text-4xl font-bold text-white mt-1">{value}</p>
             )}
           </div>
-          <div className={`p-4 rounded-full ${colorClass}`}>
-            {icon}
+          <div className="p-3 bg-slate-900/40 border border-slate-800 rounded-lg">
+            <div className={iconColor}>{icon}</div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-tr from-white/5 via-transparent to-transparent" />
+      </div>
     </motion.div>
   );
 
@@ -192,27 +196,30 @@ const Dashboard = () => {
           transition={{ delay: 0.2, staggerChildren: 0.1 }}
         >
           <StatCard
-            icon={<Radio className="w-8 h-8 text-primary-foreground" />}
+            icon={<Radio className="w-8 h-8" />}
             title="Rádios Cadastradas"
             value={stats.radios}
             loading={loadingStats}
-            colorClass="bg-green-500/80"
+            gradient="from-cyan-600/50 via-cyan-500/30 to-slate-900"
+            iconColor="text-cyan-300"
             onNavigate={() => navigate('/cadastro-radios')}
           />
           <StatCard
-            icon={<Calendar className="w-8 h-8 text-primary-foreground" />}
+            icon={<Calendar className="w-8 h-8" />}
             title="Agendamentos Ativos"
             value={stats.agendamentos}
             loading={loadingStats}
-            colorClass="bg-blue-500/80"
+            gradient="from-emerald-600/50 via-emerald-500/30 to-slate-900"
+            iconColor="text-emerald-300"
             onNavigate={() => navigate('/agendamentos')}
           />
           <StatCard
-            icon={<Download className="w-8 h-8 text-primary-foreground" />}
+            icon={<Download className="w-8 h-8" />}
             title="Gravações"
             value={stats.gravacoes}
             loading={loadingStats}
-            colorClass="bg-purple-500/80"
+            gradient="from-amber-600/40 via-amber-500/20 to-slate-900"
+            iconColor="text-amber-300"
             onNavigate={() => navigate('/gravacoes')}
           />
         </motion.div>
