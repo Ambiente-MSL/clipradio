@@ -17,6 +17,7 @@ const CadastroRadios = () => {
     favorita: false,
     bitrate_kbps: 128,
     output_format: 'mp3',
+    audio_mode: 'stereo',
   })
   const [editingId, setEditingId] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -43,7 +44,7 @@ const CadastroRadios = () => {
   const { toast } = useToast()
 
   const resetForm = useCallback(() => {
-    setFormData({ nome: '', stream_url: '', cidade: '', estado: '', favorita: false, bitrate_kbps: 128, output_format: 'mp3' })
+    setFormData({ nome: '', stream_url: '', cidade: '', estado: '', favorita: false, bitrate_kbps: 128, output_format: 'mp3', audio_mode: 'stereo' })
     setEditingId(null)
     setStreamStatus({ state: 'idle', message: '' })
   }, [])
@@ -162,6 +163,7 @@ const CadastroRadios = () => {
       favorita: radio.favorita || false,
       bitrate_kbps: radio.bitrate_kbps || 128,
       output_format: radio.output_format || 'mp3',
+      audio_mode: radio.audio_mode || 'stereo',
     })
   }
 
@@ -417,7 +419,7 @@ const CadastroRadios = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm text-slate-400 mb-1">Bitrate da gravação</label>
                       <select
@@ -437,7 +439,18 @@ const CadastroRadios = () => {
                         className="w-full bg-slate-900/60 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                       >
                         <option value="mp3">MP3</option>
-                        <option value="flac">FLAC</option>
+                        <option value="opus">Opus</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">Qualidade</label>
+                      <select
+                        value={formData.audio_mode}
+                        onChange={(e) => setFormData({ ...formData, audio_mode: e.target.value })}
+                        className="w-full bg-slate-900/60 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      >
+                        <option value="stereo">Estéreo</option>
+                        <option value="mono">Mono</option>
                       </select>
                     </div>
                   </div>
@@ -561,6 +574,9 @@ const CadastroRadios = () => {
                             </span>
                             <span className="px-2 py-0.5 rounded-md bg-slate-800/60 border border-slate-700/50 text-[11px] font-medium text-slate-300">
                               {(radio.output_format || 'mp3').toUpperCase()}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-md bg-slate-800/60 border border-slate-700/50 text-[11px] font-medium text-slate-300">
+                              {radio.audio_mode === 'mono' ? 'Mono' : 'Estéreo'}
                             </span>
                             {scheduledRadioIds.has(radio.id) && (
                               <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
@@ -742,6 +758,9 @@ const CadastroRadios = () => {
                             </span>
                             <span className="px-2 py-0.5 rounded-full bg-slate-800/80 border border-slate-700">
                               {(radio.output_format || 'mp3').toUpperCase()}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full bg-slate-800/80 border border-slate-700">
+                              {radio.audio_mode === 'mono' ? 'Mono' : 'Estéreo'}
                             </span>
                           </div>
                         </div>

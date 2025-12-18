@@ -15,7 +15,8 @@ from services.websocket_service import broadcast_update
 LOCAL_TZ = ZoneInfo("America/Fortaleza")
 MIN_RECORD_SECONDS = 10  # evita gravação zero em caso de input faltando
 ALLOWED_BITRATES = {96, 128}
-ALLOWED_FORMATS = {'mp3', 'flac'}
+ALLOWED_FORMATS = {'mp3', 'opus'}
+ALLOWED_AUDIO_MODES = {'mono', 'stereo'}
 ACTIVE_PROCESSES: Dict[str, subprocess.Popen] = {}
 
 
@@ -167,6 +168,11 @@ def start_recording(gravacao, *, duration_seconds=None, agendamento=None, block=
     if output_format not in ALLOWED_FORMATS:
         output_format = 'mp3'
 
+    audio_mode = (getattr(radio, 'audio_mode', 'stereo') or 'stereo').lower()
+    if audio_mode not in ALLOWED_AUDIO_MODES:
+        audio_mode = 'stereo'
+    channels = 1 if audio_mode == 'mono' else 2
+
     os.makedirs(os.path.join(Config.STORAGE_PATH, 'audio'), exist_ok=True)
 
     # Definir duração com fallback seguro (evita ficar gravando indefinidamente)
@@ -207,8 +213,9 @@ def start_recording(gravacao, *, duration_seconds=None, agendamento=None, block=
             str(duration_seconds),
         ]
 
-        if output_format == 'flac':
-            ffmpeg_cmd += ['-c:a', 'flac']
+        ffmpeg_cmd += ['-ac', str(channels)]
+        if output_format == 'opus':
+            ffmpeg_cmd += ['-c:a', 'libopus', '-b:a', f'{bitrate_kbps}k', '-vbr', 'on']
         else:
             ffmpeg_cmd += ['-acodec', 'libmp3lame', '-b:a', f'{bitrate_kbps}k']
 

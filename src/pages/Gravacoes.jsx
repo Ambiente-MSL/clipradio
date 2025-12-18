@@ -220,8 +220,10 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
       a.style.display = 'none';
 
       a.href = url;
-
-      a.download = `gravacao_${gravacao.id}.mp3`;
+      const suggestedName = (gravacao.arquivo_nome || (gravacao.arquivo_url ? gravacao.arquivo_url.split('/').pop() : '') || '').trim();
+      const baseName = suggestedName || `gravacao_${gravacao.id}`;
+      const downloadName = baseName.includes('.') ? baseName : `${baseName}.mp3`;
+      a.download = downloadName;
 
       document.body.appendChild(a);
 

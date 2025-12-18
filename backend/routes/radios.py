@@ -15,7 +15,8 @@ def get_user_ctx():
     }
 
 ALLOWED_BITRATES = {96, 128}
-ALLOWED_FORMATS = {'mp3', 'flac'}
+ALLOWED_FORMATS = {'mp3', 'opus'}
+ALLOWED_AUDIO_MODES = {'mono', 'stereo'}
 
 def _sanitize_bitrate(value):
     try:
@@ -27,6 +28,10 @@ def _sanitize_bitrate(value):
 def _sanitize_format(value):
     value = (value or '').lower()
     return value if value in ALLOWED_FORMATS else 'mp3'
+
+def _sanitize_audio_mode(value):
+    value = (value or '').lower()
+    return value if value in ALLOWED_AUDIO_MODES else 'stereo'
 
 @bp.route('', methods=['GET'])
 @token_required
@@ -64,6 +69,7 @@ def create_radio():
     
     bitrate = _sanitize_bitrate(data.get('bitrate_kbps', 128))
     output_format = _sanitize_format(data.get('output_format', 'mp3'))
+    audio_mode = _sanitize_audio_mode(data.get('audio_mode', 'stereo'))
     
     radio = Radio(
         user_id=user_id,
@@ -74,6 +80,7 @@ def create_radio():
         favorita=data.get('favorita', False),
         bitrate_kbps=bitrate,
         output_format=output_format,
+        audio_mode=audio_mode,
     )
     
     db.session.add(radio)
@@ -110,6 +117,8 @@ def update_radio(radio_id):
         radio.bitrate_kbps = _sanitize_bitrate(data.get('bitrate_kbps'))
     if 'output_format' in data:
         radio.output_format = _sanitize_format(data.get('output_format'))
+    if 'audio_mode' in data:
+        radio.audio_mode = _sanitize_audio_mode(data.get('audio_mode'))
     
     db.session.commit()
     

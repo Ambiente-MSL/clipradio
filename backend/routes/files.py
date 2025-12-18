@@ -10,7 +10,12 @@ def get_audio(filename):
     if not os.path.exists(audio_path):
         return jsonify({'error': 'File not found'}), 404
     ext = os.path.splitext(filename)[1].lower()
-    mimetype = 'audio/flac' if ext == '.flac' else 'audio/mpeg'
+    if ext == '.opus':
+        mimetype = 'audio/ogg'
+    elif ext == '.flac':
+        mimetype = 'audio/flac'
+    else:
+        mimetype = 'audio/mpeg'
     return send_file(audio_path, mimetype=mimetype)
 
 @bp.route('/clips/<filename>', methods=['GET'])
