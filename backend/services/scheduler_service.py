@@ -1,8 +1,10 @@
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
-from zoneinfo import ZoneInfo
-
+from apscheduler.triggers.interval import IntervalTrigger
 from flask import current_app
 
 from app import db
@@ -47,6 +49,13 @@ def init_scheduler(app=None):
             agendamentos = Agendamento.query.filter_by(status='agendado').all()
             for agendamento in agendamentos:
                 schedule_agendamento(agendamento)
+            # Job periÛdico para limpar agendamentos travados em execuÓÐo
+            scheduler.add_job(
+                cleanup_agendamentos_stuck,
+                IntervalTrigger(minutes=5),
+                id="ag_cleanup",
+                replace_existing=True,
+            )
     except Exception as e:
         print(f"Erro ao carregar agendamentos: {e}")
 
@@ -113,6 +122,45 @@ def _normalize_cron_day_of_week(dias_semana, *, default_dt=None):
             normalized = [mapped]
 
     return ",".join(normalized)
+
+
+def _next_status_after_run(agendamento):
+    """Determina status pÛs-execuÓÐo (reagendar recorrentes, concluir Ûnicos)."""
+    if not agendamento:
+        return "concluido"
+    return "agendado" if agendamento.tipo_recorrencia != "none" else "concluido"
+
+
+def cleanup_agendamentos_stuck():
+    """
+    Marca agendamentos travados em 'em_execucao' como concluÌdo/agendado
+    quando o hor·rio previsto j· passou (evita ficar eternamente 'Gravando').
+    """
+    app_obj = _capture_scheduler_app()
+    if not app_obj:
+        return
+
+    try:
+        with app_obj.app_context():
+            now = datetime.now(tz=LOCAL_TZ).replace(tzinfo=None)
+            stuck = Agendamento.query.filter_by(status="em_execucao").all()
+            atualizados = []
+            for ag in stuck:
+                duracao = ag.duracao_minutos or 0
+                fim_previsto = (ag.data_inicio or now) + timedelta(minutes=duracao, seconds=60)
+                if fim_previsto <= now:
+                    ag.status = _next_status_after_run(ag)
+                    atualizados.append(ag)
+
+            if atualizados:
+                db.session.commit()
+                for ag in atualizados:
+                    broadcast_update(f"user_{ag.user_id}", "agendamento_updated", ag.to_dict())
+    except Exception as e:
+        try:
+            print(f"cleanup_agendamentos_stuck falhou: {e}")
+        except Exception:
+            pass
 
 
 def unschedule_agendamento(agendamento_id):
@@ -193,6 +241,7 @@ def execute_agendamento(agendamento_id):
         db.session.commit()
         broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
 
+        next_status = _next_status_after_run(agendamento)
         try:
             # Bloqueia até terminar; recording_service finaliza status e atualiza gravação/arquivo
             start_recording(
@@ -207,6 +256,11 @@ def execute_agendamento(agendamento_id):
             db.session.commit()
             broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
             broadcast_update(f"user_{agendamento.user_id}", "gravacao_updated", gravacao.to_dict())
+        # Fallback para nao ficar travado em "em_execucao"/"Gravando"
+        if agendamento.status == 'em_execucao':
+            agendamento.status = next_status
+            db.session.commit()
+            broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
 
         if agendamento.tipo_recorrencia == 'none':
             unschedule_agendamento(agendamento.id)

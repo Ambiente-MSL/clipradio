@@ -128,7 +128,11 @@ def _finalizar_gravacao(gravacao, status, filepath=None, duration_seconds=None, 
 
     gravacao.status = status
     if agendamento:
-        agendamento.status = status if status in ('concluido', 'erro') else agendamento.status
+        # Recorrentes voltam para 'agendado' apÛs concluir; Ûnicos ficam 'concluido'
+        if status == 'concluido' and getattr(agendamento, 'tipo_recorrencia', 'none') != 'none':
+            agendamento.status = 'agendado'
+        else:
+            agendamento.status = status if status in ('concluido', 'erro') else agendamento.status
 
     db.session.commit()
 
