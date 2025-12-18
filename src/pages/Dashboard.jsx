@@ -217,136 +217,143 @@ const Dashboard = () => {
         </motion.div>
 
         <motion.div
-          className="mt-8"
+          className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          <Card className="bg-slate-800/40 border-slate-700/60">
-            <CardHeader>
-              <CardTitle className="flex items-center text-white">
-                <Plus className="w-6 h-6 mr-3 text-cyan-400" />
-                Nova Rádio
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">Nome da Rádio</label>
-                  <Input
-                    value={formData.nome}
-                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                    placeholder="Ex: Rádio Rock"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">URL do Stream</label>
-                  <div className="relative">
+          {/* Card Nova Rádio - Esquerda */}
+          <div className="lg:col-span-1">
+            <Card className="bg-slate-800/40 border-slate-700/60">
+              <CardHeader>
+                <CardTitle className="flex items-center text-white">
+                  <Plus className="w-6 h-6 mr-3 text-cyan-400" />
+                  Nova Rádio
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Nome da Rádio</label>
                     <Input
-                      className="pr-10"
-                      value={formData.stream_url}
-                      onChange={(e) => setFormData({ ...formData, stream_url: e.target.value })}
-                      placeholder="https://stream.minharadio.com/stream"
+                      value={formData.nome}
+                      onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                      placeholder="Ex: Rádio Rock"
                     />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      {renderStreamStatusIcon()}
-                    </div>
                   </div>
-                  {streamStatus.state === 'error' && (
-                    <p className="text-xs text-red-400 mt-1">{streamStatus.message}</p>
-                  )}
-                  {streamStatus.state === 'valid' && (
-                    <p className="text-xs text-emerald-400 mt-1">
-                      Stream reconhecido e pronto para agendamentos ou gravações.
-                    </p>
-                  )}
-                  {streamStatus.state === 'loading' && (
-                    <p className="text-xs text-slate-400 mt-1">Validando stream...</p>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm text-slate-400 mb-1">Cidade</label>
+                    <label className="block text-sm text-slate-400 mb-1">URL do Stream</label>
                     <div className="relative">
                       <Input
-                        value={formData.cidade}
-                        onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
-                        placeholder="São Paulo"
+                        className="pr-10"
+                        value={formData.stream_url}
+                        onChange={(e) => setFormData({ ...formData, stream_url: e.target.value })}
+                        placeholder="https://stream.minharadio.com/stream"
                       />
-                      <Globe className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        {renderStreamStatusIcon()}
+                      </div>
+                    </div>
+                    {streamStatus.state === 'error' && (
+                      <p className="text-xs text-red-400 mt-1">{streamStatus.message}</p>
+                    )}
+                    {streamStatus.state === 'valid' && (
+                      <p className="text-xs text-emerald-400 mt-1">
+                        Stream reconhecido e pronto para agendamentos ou gravações.
+                      </p>
+                    )}
+                    {streamStatus.state === 'loading' && (
+                      <p className="text-xs text-slate-400 mt-1">Validando stream...</p>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">Cidade</label>
+                      <div className="relative">
+                        <Input
+                          value={formData.cidade}
+                          onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
+                          placeholder="São Paulo"
+                        />
+                        <Globe className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">Estado (UF)</label>
+                      <div className="relative">
+                        <Input
+                          maxLength={2}
+                          value={formData.estado}
+                          onChange={(e) => setFormData({ ...formData, estado: e.target.value.toUpperCase() })}
+                          placeholder="SP"
+                        />
+                        <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Estado (UF)</label>
-                    <div className="relative">
-                      <Input
-                        maxLength={2}
-                        value={formData.estado}
-                        onChange={(e) => setFormData({ ...formData, estado: e.target.value.toUpperCase() })}
-                        placeholder="SP"
-                      />
-                      <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">Bitrate da gravação</label>
+                      <select
+                        value={formData.bitrate_kbps}
+                        onChange={(e) => setFormData({ ...formData, bitrate_kbps: Number(e.target.value) })}
+                        className="w-full bg-slate-900/60 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      >
+                        <option value={128}>128 kbps</option>
+                        <option value={96}>96 kbps</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">Formato do arquivo</label>
+                      <select
+                        value={formData.output_format}
+                        onChange={(e) => setFormData({ ...formData, output_format: e.target.value })}
+                        className="w-full bg-slate-900/60 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      >
+                        <option value="mp3">MP3</option>
+                        <option value="flac">FLAC</option>
+                      </select>
                     </div>
                   </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Bitrate da gravação</label>
-                    <select
-                      value={formData.bitrate_kbps}
-                      onChange={(e) => setFormData({ ...formData, bitrate_kbps: Number(e.target.value) })}
-                      className="w-full bg-slate-900/60 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                    >
-                      <option value={128}>128 kbps</option>
-                      <option value={96}>96 kbps</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Formato do arquivo</label>
-                    <select
-                      value={formData.output_format}
-                      onChange={(e) => setFormData({ ...formData, output_format: e.target.value })}
-                      className="w-full bg-slate-900/60 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                    >
-                      <option value="mp3">MP3</option>
-                      <option value="flac">FLAC</option>
-                    </select>
-                  </div>
-                </div>
 
-                <div className="flex items-center justify-between py-2">
-                  <span className="text-sm text-slate-300">Marcar como favorita</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setFormData((prev) => ({ ...prev, favorita: !prev.favorita }))}
-                    className="text-yellow-400"
-                  >
-                    {formData.favorita ? <Star className="w-5 h-5" /> : <StarOff className="w-5 h-5" />}
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-sm text-slate-300">Marcar como favorita</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setFormData((prev) => ({ ...prev, favorita: !prev.favorita }))}
+                      className="text-yellow-400"
+                    >
+                      {formData.favorita ? <Star className="w-5 h-5" /> : <StarOff className="w-5 h-5" />}
+                    </Button>
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={saving}>
+                    {saving ? 'Salvando...' : 'Adicionar Rádio'}
                   </Button>
-                </div>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
 
-                <Button type="submit" className="w-full" disabled={saving}>
-                  {saving ? 'Salvando...' : 'Adicionar Rádio'}
+          {/* Card Painel de Rádios - Direita */}
+          <div className="lg:col-span-2">
+            <Card className="bg-slate-800/40 border-slate-700/60 h-full">
+              <CardContent className="flex flex-col items-center justify-center h-full p-8 text-center">
+                <LayoutGrid className="w-16 h-16 text-cyan-400 mb-4" />
+                <h2 className="text-2xl font-bold text-white mb-2">Acesse o Painel de Rádios</h2>
+                <p className="text-slate-400 mb-6 max-w-md">
+                  Controle suas rádios, ouça ao vivo, grave manualmente e veja seus agendamentos.
+                </p>
+                <Button
+                  className="bg-cyan-500 hover:bg-cyan-600 text-white"
+                  onClick={() => navigate('/cadastro-radios')}
+                >
+                  <LayoutGrid className="w-5 h-5 mr-2" />
+                  Ir para Rádios
                 </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          className="mt-8 text-center"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
-          <div className="card">
-            <h2 className="text-2xl font-bold text-foreground">Acesse o Painel de Rádios</h2>
-            <p className="text-muted-foreground mt-2 mb-6">Controle suas rádios, ouça ao vivo, grave manualmente e veja seus agendamentos.</p>
-            <Button className="btn btn-primary" onClick={() => navigate('/cadastro-radios')}>
-              <LayoutGrid className="w-5 h-5 mr-2" />
-              Ir para Rádios
-            </Button>
+              </CardContent>
+            </Card>
           </div>
         </motion.div>
       </div>

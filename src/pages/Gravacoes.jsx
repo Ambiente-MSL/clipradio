@@ -79,7 +79,7 @@ const GravacoesFilter = ({ filters, setFilters, radios }) => {
 
         <div>
 
-          <label htmlFor="filterRadio" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por RaRadio</label>
+          <label htmlFor="filterRadio" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por rádio</label>
 
           <div className="relative">
 
