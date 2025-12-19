@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import apiClient from '@/lib/apiClient'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 
 const CadastroRadios = () => {
   const [radios, setRadios] = useState([])
@@ -255,19 +256,19 @@ const CadastroRadios = () => {
 
   const isPlaying = (id) => currentRadioId === id && audioRef.current && !audioRef.current.paused
 
-  const toggleRecordPanel = (radioId) => {
-    if (recordPanelRadioId === radioId) {
-      setRecordPanelRadioId(null)
-    } else {
-      setRecordPanelRadioId(radioId)
-      setRecordStartTime('')
-      setRecordEndTime('')
-      const today = new Date()
-      const month = String(today.getMonth() + 1).padStart(2, '0')
-      const day = String(today.getDate()).padStart(2, '0')
-      setRecordDate(`${today.getFullYear()}-${month}-${day}`)
-      setRecordRecurrence('once')
-    }
+  const openRecordModal = (radioId) => {
+    setRecordPanelRadioId(radioId)
+    setRecordStartTime('')
+    setRecordEndTime('')
+    const today = new Date()
+    const month = String(today.getMonth() + 1).padStart(2, '0')
+    const day = String(today.getDate()).padStart(2, '0')
+    setRecordDate(`${today.getFullYear()}-${month}-${day}`)
+    setRecordRecurrence('once')
+  }
+
+  const closeRecordModal = () => {
+    setRecordPanelRadioId(null)
   }
 
   const handleStartRecording = async (radio) => {
@@ -317,7 +318,7 @@ const CadastroRadios = () => {
       setTimeout(() => {
         setActiveRecordingId((current) => current === radio.id ? null : current)
       }, plannedDuration * 60 * 1000 + 60000)
-      setRecordPanelRadioId(null)
+      closeRecordModal()
     } catch (error) {
       toast({
         title: 'Erro ao iniciar',
@@ -612,18 +613,18 @@ const CadastroRadios = () => {
                             {/* Botão Gravar */}
                             {(() => {
                               const isRecording = activeRecordingId === radio.id
-                              const isOpen = recordPanelRadioId === radio.id
-                              const baseClasses = 'flex-1 h-9 font-medium'
-                              const activeClasses = 'bg-red-500 hover:bg-red-600 text-white border-red-500 animate-pulse'
+                              const baseClasses = 'flex-1 h-9 font-medium transition-all duration-300'
+                              const activeClasses = 'bg-red-500 hover:bg-red-600 text-white border-red-500 shadow-lg shadow-red-500/30'
                               const defaultClasses = 'border-slate-700 hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-400'
                               return (
                                 <Button
                                   size="sm"
-                                  variant={isOpen || isRecording ? 'default' : 'outline'}
-                                  onClick={() => toggleRecordPanel(radio.id)}
-                                  className={`${baseClasses} ${isOpen || isRecording ? activeClasses : defaultClasses}`}
+                                  variant={isRecording ? 'default' : 'outline'}
+                                  onClick={() => openRecordModal(radio.id)}
+                                  className={`${baseClasses} ${isRecording ? activeClasses : defaultClasses}`}
+                                  disabled={isRecording}
                                 >
-                                  <CircleDot className="w-3.5 h-3.5 mr-1.5" />
+                                  <CircleDot className={`w-3.5 h-3.5 mr-1.5 ${isRecording ? 'animate-pulse' : ''}`} />
                                   {isRecording ? 'Gravando' : 'Gravar'}
                                 </Button>
                               )
@@ -652,73 +653,6 @@ const CadastroRadios = () => {
                             </Button>
                           </div>
                         </div>
-
-                        {/* Painel de gravacao */}
-                        {recordPanelRadioId === radio.id && (
-                          <div className='px-4 pb-4 border-t border-slate-800/50 pt-3 bg-slate-950/40'>
-                            <div className='space-y-4'>
-                              <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-200'>
-                                <div className='flex flex-col gap-1'>
-                                  <span className='font-semibold text-slate-100'>Hora de Inicio</span>
-                                  <input
-                                    type='time'
-                                    value={recordStartTime}
-                                    onChange={(e) => setRecordStartTime(e.target.value)}
-                                    className='bg-slate-800/80 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500'
-                                  />
-                                </div>
-                                <div className='flex flex-col gap-1'>
-                                  <span className='font-semibold text-slate-100'>Hora de Fim</span>
-                                  <input
-                                    type='time'
-                                    value={recordEndTime}
-                                    onChange={(e) => setRecordEndTime(e.target.value)}
-                                    className='bg-slate-800/80 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500'
-                                  />
-                                </div>
-                              </div>
-                              <div className='flex flex-col gap-1 text-sm text-slate-200'>
-                                <span className='font-semibold text-slate-100'>Recorrencia</span>
-                                <select
-                                  value={recordRecurrence}
-                                  onChange={(e) => setRecordRecurrence(e.target.value)}
-                                  className='bg-slate-800/80 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500'
-                                >
-                                  <option value='once'>Gravacao Unica</option>
-                                  <option value='daily'>Diaria</option>
-                                  <option value='weekly'>Semanal</option>
-                                </select>
-                              </div>
-                              <div className='flex flex-col gap-1 text-sm text-slate-200'>
-                                <span className='font-semibold text-slate-100'>Data da Gravacao</span>
-                                <input
-                                  type='date'
-                                  value={recordDate}
-                                  onChange={(e) => setRecordDate(e.target.value)}
-                                  className='bg-slate-800/80 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500'
-                                />
-                              </div>
-                              <Button
-                                size='sm'
-                                disabled={startingRecording}
-                                onClick={() => handleStartRecording(radio)}
-                                className='w-full h-9 bg-red-500 hover:bg-red-600 text-white font-semibold'
-                              >
-                                {startingRecording ? (
-                                  <>
-                                    <Loader className='w-3.5 h-3.5 mr-2 animate-spin' />
-                                    Iniciando...
-                                  </>
-                                ) : (
-                                  <>
-                                    <CircleDot className='w-3.5 h-3.5 mr-2' />
-                                    Iniciar Gravacao
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -767,18 +701,18 @@ const CadastroRadios = () => {
                         <div className="flex items-center gap-2 flex-shrink-0">
                           {(() => {
                             const isRecording = activeRecordingId === radio.id
-                            const isOpen = recordPanelRadioId === radio.id
-                            const baseClasses = 'h-8 px-3 text-xs font-medium'
-                            const activeClasses = 'bg-red-500 hover:bg-red-600 text-white border-red-500 animate-pulse'
+                            const baseClasses = 'h-8 px-3 text-xs font-medium transition-all duration-300'
+                            const activeClasses = 'bg-red-500 hover:bg-red-600 text-white border-red-500 shadow-lg shadow-red-500/30'
                             const defaultClasses = 'border-slate-700 hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-400'
                             return (
                               <Button
                                 size="sm"
-                                variant={isOpen || isRecording ? 'default' : 'outline'}
-                                onClick={() => toggleRecordPanel(radio.id)}
-                                className={`${baseClasses} ${isOpen || isRecording ? activeClasses : defaultClasses}`}
+                                variant={isRecording ? 'default' : 'outline'}
+                                onClick={() => openRecordModal(radio.id)}
+                                className={`${baseClasses} ${isRecording ? activeClasses : defaultClasses}`}
+                                disabled={isRecording}
                               >
-                                <CircleDot className="w-3 h-3 mr-1" />
+                                <CircleDot className={`w-3 h-3 mr-1 ${isRecording ? 'animate-pulse' : ''}`} />
                                 {isRecording ? 'Gravando' : 'Gravar'}
                               </Button>
                             )
@@ -814,69 +748,6 @@ const CadastroRadios = () => {
                             )}
                           </Button>
                         </div>
-                        {recordPanelRadioId === radio.id && (
-                          <div className="mt-2 w-full bg-slate-900/50 border border-slate-800 rounded-lg p-3">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-200">
-                              <div className="flex flex-col gap-1">
-                                <span className="font-semibold text-slate-100">Hora de Inicio</span>
-                                <input
-                                  type="time"
-                                  value={recordStartTime}
-                                  onChange={(e) => setRecordStartTime(e.target.value)}
-                                  className="bg-slate-800/80 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                                />
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <span className="font-semibold text-slate-100">Hora de Fim</span>
-                                <input
-                                  type="time"
-                                  value={recordEndTime}
-                                  onChange={(e) => setRecordEndTime(e.target.value)}
-                                  className="bg-slate-800/80 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                                />
-                              </div>
-                            </div>
-                            <div className="flex flex-col gap-1 text-sm text-slate-200 mt-3">
-                              <span className="font-semibold text-slate-100">Recorrencia</span>
-                              <select
-                                value={recordRecurrence}
-                                onChange={(e) => setRecordRecurrence(e.target.value)}
-                                className="bg-slate-800/80 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                              >
-                                <option value="once">Gravacao Unica</option>
-                                <option value="daily">Diaria</option>
-                                <option value="weekly">Semanal</option>
-                              </select>
-                            </div>
-                            <div className="flex flex-col gap-1 text-sm text-slate-200 mt-3">
-                              <span className="font-semibold text-slate-100">Data da Gravacao</span>
-                              <input
-                                type="date"
-                                value={recordDate}
-                                onChange={(e) => setRecordDate(e.target.value)}
-                                className="bg-slate-800/80 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                              />
-                            </div>
-                            <Button
-                              size="sm"
-                              disabled={startingRecording}
-                              onClick={() => handleStartRecording(radio)}
-                              className="mt-4 w-full h-9 bg-red-500 hover:bg-red-600 text-white font-semibold"
-                            >
-                              {startingRecording ? (
-                                <>
-                                  <Loader className="w-3.5 h-3.5 mr-2 animate-spin" />
-                                  Iniciando...
-                                </>
-                              ) : (
-                                <>
-                                  <CircleDot className="w-3.5 h-3.5 mr-2" />
-                                  Iniciar Gravacao
-                                </>
-                              )}
-                            </Button>
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -885,6 +756,98 @@ const CadastroRadios = () => {
             </Card>
           </motion.div>
         </div>
+
+        {/* Modal de Gravação */}
+        <Dialog open={recordPanelRadioId !== null} onOpenChange={(open) => !open && closeRecordModal()}>
+          <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">
+                <CircleDot className="w-5 h-5 text-red-500" />
+                Configurar Gravação
+              </DialogTitle>
+              <DialogDescription className="text-slate-400">
+                {recordPanelRadioId && radios.find(r => r.id === recordPanelRadioId)?.nome}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-semibold text-slate-300">Hora de Início</label>
+                  <input
+                    type="time"
+                    value={recordStartTime}
+                    onChange={(e) => setRecordStartTime(e.target.value)}
+                    className="bg-slate-800/80 border border-slate-700 rounded-md px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-semibold text-slate-300">Hora de Fim</label>
+                  <input
+                    type="time"
+                    value={recordEndTime}
+                    onChange={(e) => setRecordEndTime(e.target.value)}
+                    className="bg-slate-800/80 border border-slate-700 rounded-md px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-semibold text-slate-300">Data da Gravação</label>
+                <input
+                  type="date"
+                  value={recordDate}
+                  onChange={(e) => setRecordDate(e.target.value)}
+                  className="bg-slate-800/80 border border-slate-700 rounded-md px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-semibold text-slate-300">Recorrência</label>
+                <select
+                  value={recordRecurrence}
+                  onChange={(e) => setRecordRecurrence(e.target.value)}
+                  className="bg-slate-800/80 border border-slate-700 rounded-md px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                >
+                  <option value="once">Gravação Única</option>
+                  <option value="daily">Diária</option>
+                  <option value="weekly">Semanal</option>
+                </select>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={closeRecordModal}
+                  className="flex-1 border-slate-700 hover:bg-slate-800 text-slate-300"
+                  disabled={startingRecording}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  disabled={startingRecording}
+                  onClick={() => {
+                    const radio = radios.find(r => r.id === recordPanelRadioId)
+                    if (radio) handleStartRecording(radio)
+                  }}
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold shadow-lg shadow-red-500/20"
+                >
+                  {startingRecording ? (
+                    <>
+                      <Loader className="w-4 h-4 mr-2 animate-spin" />
+                      Iniciando...
+                    </>
+                  ) : (
+                    <>
+                      <CircleDot className="w-4 h-4 mr-2" />
+                      Iniciar Gravação
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )
