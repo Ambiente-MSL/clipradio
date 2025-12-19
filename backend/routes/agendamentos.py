@@ -70,54 +70,185 @@ def _escape_pdf_text(text):
     return str(text).replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
 
 
-def _generate_pdf(rows):
-    """Gera PDF mínimo sem dependências externas (texto simples)."""
-    lines = [
-        "Relatório de Agendamentos",
-        f"Gerado em: {dt_mod.now().isoformat(timespec='seconds')}",
-        "",
-        "ID | Rádio | Início | Duração (min) | Recorrência | Dias | Status",
+def _generate_pdf(rows, start_date=None, end_date=None):
+    """Gera PDF simples com colunas alinhadas (texto monoespacado)."""
+    columns = [
+        ("ID", 8),
+        ("RADIO", 18),
+        ("INICIO", 16),
+        ("DUR", 4),
+        ("RECOR", 8),
+        ("DIAS", 12),
+        ("STATUS", 10),
     ]
+
+    def _fit(text, width, align="left"):
+        value = "" if text is None else str(text)
+        if len(value) > width:
+            value = value[: width - 3] + "..." if width > 3 else value[:width]
+        return value.rjust(width) if align == "right" else value.ljust(width)
+
+    def _format_date(value):
+        if not value:
+            return ""
+        text = str(value)
+        if "T" in text:
+            text = text.replace("T", " ")
+        if "+" in text:
+            text = text.split("+", 1)[0]
+        if text.endswith("Z"):
+            text = text[:-1]
+        return text[:16]
+
+    def _format_dias(value):
+        if not value:
+            return ""
+        day_map = {
+            0: "Dom",
+            1: "Seg",
+            2: "Ter",
+            3: "Qua",
+            4: "Qui",
+            5: "Sex",
+            6: "Sab",
+        }
+        parts = [part.strip() for part in str(value).split(",") if part.strip()]
+        labels = []
+        for part in parts:
+            if part.isdigit():
+                labels.append(day_map.get(int(part), part))
+            else:
+                labels.append(part[:3])
+        return ",".join(labels)
+
+    def _format_recorrencia(value):
+        mapping = {
+            "none": "unico",
+            "daily": "diario",
+            "weekly": "semanal",
+            "monthly": "mensal",
+        }
+        return mapping.get(str(value or "").lower(), str(value or ""))
+
+    def _format_status(value):
+        mapping = {
+            "em_execucao": "execucao",
+        }
+        return mapping.get(str(value or ""), str(value or ""))
+
+    def _build_line(values):
+        parts = []
+        for (label, width), value in zip(columns, values):
+            align = "right" if label == "DUR" else "left"
+            parts.append(_fit(value, width, align=align))
+        return " ".join(parts).rstrip()
+
+    title = "Relatorio de Agendamentos"
+    generated = f"Gerado em: {dt_mod.now().isoformat(timespec='seconds')}"
+    period_line = None
+    if start_date and end_date:
+        period_line = f"Periodo: {start_date} a {end_date}"
+    elif start_date:
+        period_line = f"Periodo: a partir de {start_date}"
+    elif end_date:
+        period_line = f"Periodo: ate {end_date}"
+
+    header_line = _build_line([label for label, _ in columns])
+    separator = "-" * len(header_line)
+
+    data_lines = []
     for row in rows:
-        lines.append(
-            f"{row['id']} | {row['radio']} | {row['data_inicio']} | {row['duracao_minutos']} | "
-            f"{row['tipo_recorrencia']} | {row['dias_semana']} | {row['status']}"
+        data_lines.append(
+            _build_line(
+                [
+                    (row.get("id") or "")[:8],
+                    row.get("radio"),
+                    _format_date(row.get("data_inicio")),
+                    row.get("duracao_minutos"),
+                    _format_recorrencia(row.get("tipo_recorrencia")),
+                    _format_dias(row.get("dias_semana")),
+                    _format_status(row.get("status")),
+                ]
+            )
         )
 
+    if not data_lines:
+        data_lines = ["Sem agendamentos para o periodo selecionado."]
+
+    header_lines = [title, generated]
+    if period_line:
+        header_lines.append(period_line)
+    header_lines += ["", header_line, separator]
+
+    continuation_header = [f"{title} (continua)", "", header_line, separator]
+
     leading = 14
-    stream_lines = ["BT", "/F1 12 Tf", f"{leading} TL", "72 750 Td"]
-    for idx, text in enumerate(lines):
-        escaped = _escape_pdf_text(text)
-        if idx == 0:
-            stream_lines.append(f"({escaped}) Tj")
-        else:
-            stream_lines.append("T*")
-            stream_lines.append(f"({escaped}) Tj")
-    stream_lines.append("ET")
-    stream_content = "\n".join(stream_lines)
-    stream_bytes = stream_content.encode("latin-1", errors="ignore")
+    margin_x = 40
+    start_y = 760
+    max_lines = 50
+
+    pages = []
+    current = list(header_lines)
+    for line in data_lines:
+        if len(current) >= max_lines:
+            pages.append(current)
+            current = list(continuation_header)
+        current.append(line)
+    if current:
+        pages.append(current)
 
     objects = []
 
     def obj(idx, content):
         return f"{idx} 0 obj\n{content}\nendobj\n"
 
+    font_id = 3
+    page_count = len(pages)
+    first_page_id = 4
+    kids = []
+
     objects.append(obj(1, "<< /Type /Catalog /Pages 2 0 R >>"))
-    objects.append(obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"))
-    objects.append(
-        obj(
-            3,
-            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R "
-            "/Resources << /Font << /F1 5 0 R >> >> >>",
+
+    for i in range(page_count):
+        page_id = first_page_id + (i * 2)
+        content_id = page_id + 1
+        kids.append(f"{page_id} 0 R")
+
+    pages_obj = f"<< /Type /Pages /Kids [{' '.join(kids)}] /Count {page_count} >>"
+    objects.append(obj(2, pages_obj))
+    objects.append(obj(font_id, "<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>"))
+
+    for i, page_lines in enumerate(pages):
+        page_id = first_page_id + (i * 2)
+        content_id = page_id + 1
+        stream_lines = [
+            "BT",
+            "/F1 10 Tf",
+            f"{leading} TL",
+            f"{margin_x} {start_y} Td",
+        ]
+        for idx, text in enumerate(page_lines):
+            escaped = _escape_pdf_text(text)
+            if idx == 0:
+                stream_lines.append(f"({escaped}) Tj")
+            else:
+                stream_lines.append("T*")
+                stream_lines.append(f"({escaped}) Tj")
+        stream_lines.append("ET")
+        stream_content = "\n".join(stream_lines)
+        stream_bytes = stream_content.encode("latin-1", errors="ignore")
+
+        page_obj = (
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            f"/Contents {content_id} 0 R /Resources << /Font << /F1 {font_id} 0 R >> >> >>"
         )
-    )
-    objects.append(
-        obj(
-            4,
-            f"<< /Length {len(stream_bytes)} >>\nstream\n{stream_content}\nendstream",
+        objects.append(obj(page_id, page_obj))
+        objects.append(
+            obj(
+                content_id,
+                f"<< /Length {len(stream_bytes)} >>\nstream\n{stream_content}\nendstream",
+            )
         )
-    )
-    objects.append(obj(5, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"))
 
     pdf_parts = ["%PDF-1.4\n"]
     offsets = []
@@ -137,7 +268,10 @@ def _generate_pdf(rows):
         "%%EOF",
     ]
 
-    pdf_bytes = "".join(pdf_parts + ["\n".join(xref) + "\n", "\n".join(trailer)]).encode("latin-1", errors="ignore")
+    pdf_bytes = "".join(pdf_parts + ["\n".join(xref) + "\n", "\n".join(trailer)]).encode(
+        "latin-1",
+        errors="ignore",
+    )
     return pdf_bytes
 
 @bp.route('', methods=['GET'])
@@ -178,7 +312,7 @@ def export_agendamentos():
     filename_base = f"agendamentos_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     if export_format == 'pdf':
-        pdf_bytes = _generate_pdf(rows)
+        pdf_bytes = _generate_pdf(rows, start_date=start_date, end_date=end_date)
         return Response(
             pdf_bytes,
             mimetype='application/pdf',
