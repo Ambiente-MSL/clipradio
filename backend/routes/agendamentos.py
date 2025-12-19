@@ -33,10 +33,13 @@ def parse_datetime_local(dt_value):
 
 bp = Blueprint('agendamentos', __name__)
 
-def get_user_id():
+def get_user_ctx():
     token = flask_request.headers.get('Authorization', '').replace('Bearer ', '')
-    payload = decode_token(token)
-    return payload['user_id'] if payload else None
+    payload = decode_token(token) or {}
+    return {
+        'user_id': payload.get('user_id'),
+        'is_admin': payload.get('is_admin', False),
+    }
 
 
 def _agendamento_to_row(agendamento):
@@ -277,20 +280,29 @@ def _generate_pdf(rows, start_date=None, end_date=None):
 @bp.route('', methods=['GET'])
 @token_required
 def get_agendamentos():
-    user_id = get_user_id()
-    agendamentos = Agendamento.query.filter_by(user_id=user_id).order_by(Agendamento.data_inicio.desc()).all()
+    ctx = get_user_ctx()
+    user_id = ctx.get('user_id')
+    is_admin = ctx.get('is_admin', False)
+    query = Agendamento.query
+    if not is_admin:
+        query = query.filter_by(user_id=user_id)
+    agendamentos = query.order_by(Agendamento.data_inicio.desc()).all()
     return jsonify([a.to_dict(include_radio=True) for a in agendamentos]), 200
 
 @bp.route('/report', methods=['GET'])
 @token_required
 def export_agendamentos():
     """Exporta todos os agendamentos do usuário em CSV ou PDF."""
-    user_id = get_user_id()
+    ctx = get_user_ctx()
+    user_id = ctx.get('user_id')
+    is_admin = ctx.get('is_admin', False)
     export_format = request.args.get('format', 'csv').lower()
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
 
-    query = Agendamento.query.filter_by(user_id=user_id)
+    query = Agendamento.query
+    if not is_admin:
+        query = query.filter_by(user_id=user_id)
     if start_date:
         try:
             start_dt = datetime.fromisoformat(start_date)
@@ -330,8 +342,10 @@ def export_agendamentos():
 @bp.route('/<agendamento_id>', methods=['GET'])
 @token_required
 def get_agendamento(agendamento_id):
-    user_id = get_user_id()
-    agendamento = Agendamento.query.filter_by(id=agendamento_id, user_id=user_id).first()
+    ctx = get_user_ctx()
+    user_id = ctx.get('user_id')
+    is_admin = ctx.get('is_admin', False)
+    agendamento = Agendamento.query.filter_by(id=agendamento_id).first() if is_admin else Agendamento.query.filter_by(id=agendamento_id, user_id=user_id).first()
     if not agendamento:
         return jsonify({'error': 'Agendamento not found'}), 404
     return jsonify(agendamento.to_dict(include_radio=True)), 200
@@ -339,7 +353,8 @@ def get_agendamento(agendamento_id):
 @bp.route('', methods=['POST'])
 @token_required
 def create_agendamento():
-    user_id = get_user_id()
+    ctx = get_user_ctx()
+    user_id = ctx.get('user_id')
     data = request.get_json()
     
     if not data.get('radio_id') or not data.get('data_inicio') or not data.get('duracao_minutos'):
@@ -378,8 +393,10 @@ def create_agendamento():
 @bp.route('/<agendamento_id>', methods=['PUT'])
 @token_required
 def update_agendamento(agendamento_id):
-    user_id = get_user_id()
-    agendamento = Agendamento.query.filter_by(id=agendamento_id, user_id=user_id).first()
+    ctx = get_user_ctx()
+    user_id = ctx.get('user_id')
+    is_admin = ctx.get('is_admin', False)
+    agendamento = Agendamento.query.filter_by(id=agendamento_id).first() if is_admin else Agendamento.query.filter_by(id=agendamento_id, user_id=user_id).first()
     if not agendamento:
         return jsonify({'error': 'Agendamento not found'}), 404
     
@@ -403,7 +420,8 @@ def update_agendamento(agendamento_id):
     
     # Broadcast update
     from services.websocket_service import broadcast_update
-    broadcast_update(f'user_{user_id}', 'agendamento_updated', agendamento.to_dict())
+    target_user_id = agendamento.user_id or user_id
+    broadcast_update(f'user_{target_user_id}', 'agendamento_updated', agendamento.to_dict())
 
     # Atualiza job do scheduler conforme status
     if agendamento.status == 'agendado':
@@ -419,8 +437,10 @@ def update_agendamento(agendamento_id):
 @bp.route('/<agendamento_id>', methods=['DELETE'])
 @token_required
 def delete_agendamento(agendamento_id):
-    user_id = get_user_id()
-    agendamento = Agendamento.query.filter_by(id=agendamento_id, user_id=user_id).first()
+    ctx = get_user_ctx()
+    user_id = ctx.get('user_id')
+    is_admin = ctx.get('is_admin', False)
+    agendamento = Agendamento.query.filter_by(id=agendamento_id).first() if is_admin else Agendamento.query.filter_by(id=agendamento_id, user_id=user_id).first()
     if not agendamento:
         return jsonify({'error': 'Agendamento not found'}), 404
     
@@ -432,15 +452,18 @@ def delete_agendamento(agendamento_id):
     
     # Broadcast update
     from services.websocket_service import broadcast_update
-    broadcast_update(f'user_{user_id}', 'agendamento_deleted', {'id': agendamento_id})
+    target_user_id = agendamento.user_id or user_id
+    broadcast_update(f'user_{target_user_id}', 'agendamento_deleted', {'id': agendamento_id})
     
     return jsonify({'message': 'Agendamento deleted'}), 200
 
 @bp.route('/<agendamento_id>/toggle-status', methods=['POST'])
 @token_required
 def toggle_status(agendamento_id):
-    user_id = get_user_id()
-    agendamento = Agendamento.query.filter_by(id=agendamento_id, user_id=user_id).first()
+    ctx = get_user_ctx()
+    user_id = ctx.get('user_id')
+    is_admin = ctx.get('is_admin', False)
+    agendamento = Agendamento.query.filter_by(id=agendamento_id).first() if is_admin else Agendamento.query.filter_by(id=agendamento_id, user_id=user_id).first()
     if not agendamento:
         return jsonify({'error': 'Agendamento not found'}), 404
     
@@ -458,6 +481,7 @@ def toggle_status(agendamento_id):
     
     # Broadcast update
     from services.websocket_service import broadcast_update
-    broadcast_update(f'user_{user_id}', 'agendamento_updated', agendamento.to_dict())
+    target_user_id = agendamento.user_id or user_id
+    broadcast_update(f'user_{target_user_id}', 'agendamento_updated', agendamento.to_dict())
     
     return jsonify(agendamento.to_dict(include_radio=True)), 200
