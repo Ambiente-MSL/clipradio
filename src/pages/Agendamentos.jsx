@@ -3,12 +3,14 @@ import { motion } from 'framer-motion';
 import { Calendar, Clock, Plus, Edit, Trash2, Power, PowerOff, Loader, AlertCircle, CheckCircle, Repeat, FileDown } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import apiClient from '@/lib/apiClient';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatInTimeZone } from 'date-fns-tz';
 import AgendamentoForm from '@/components/AgendamentoForm';
 
@@ -18,6 +20,10 @@ const Agendamentos = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [exportingFormat, setExportingFormat] = useState(null);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reportFormat, setReportFormat] = useState(null);
+  const [reportStartDate, setReportStartDate] = useState('');
+  const [reportEndDate, setReportEndDate] = useState('');
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -133,10 +139,18 @@ const Agendamentos = () => {
     fetchAgendamentos(); // Atualiza a lista após fechar o modal
   };
 
-  const handleExport = async (format) => {
+  const openReportModal = (format) => {
+    const today = new Date().toISOString().split('T')[0];
+    setReportFormat(format);
+    setReportStartDate((prev) => prev || today);
+    setReportEndDate((prev) => prev || today);
+    setIsReportModalOpen(true);
+  };
+
+  const handleExport = async (format, { startDate, endDate }) => {
     setExportingFormat(format);
     try {
-      const { blob, filename } = await apiClient.downloadAgendamentosReport(format);
+      const { blob, filename } = await apiClient.downloadAgendamentosReport(format, { startDate, endDate });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -145,13 +159,32 @@ const Agendamentos = () => {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-      toast({ title: `Relatório ${format.toUpperCase()} gerado`, description: 'Download iniciado.' });
+      toast({ title: `Relat?rio ${format.toUpperCase()} gerado`, description: 'Download iniciado.' });
+      return true;
     } catch (error) {
-      toast({ title: 'Erro ao gerar relatório', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao gerar relat?rio', description: error.message, variant: 'destructive' });
+      return false;
     } finally {
       setExportingFormat(null);
     }
   };
+
+  const handleConfirmReport = async () => {
+    if (!reportFormat) return;
+    if (!reportStartDate || !reportEndDate) {
+      toast({ title: 'Selecione o periodo', description: 'Informe data inicial e final.', variant: 'destructive' });
+      return;
+    }
+    if (reportStartDate > reportEndDate) {
+      toast({ title: 'Periodo invalido', description: 'A data inicial deve ser anterior ou igual a data final.', variant: 'destructive' });
+      return;
+    }
+    const success = await handleExport(reportFormat, { startDate: reportStartDate, endDate: reportEndDate });
+    if (success) {
+      setIsReportModalOpen(false);
+    }
+  };
+
 
   return (
     <>
@@ -170,7 +203,7 @@ const Agendamentos = () => {
               <Button
                 variant="outline"
                 className="border-slate-700 text-slate-100 hover:border-cyan-400"
-                onClick={() => handleExport('csv')}
+                onClick={() => openReportModal('csv')}
                 disabled={exportingFormat !== null}
               >
                 <FileDown className="w-4 h-4 mr-2" />
@@ -179,7 +212,7 @@ const Agendamentos = () => {
               <Button
                 variant="outline"
                 className="border-slate-700 text-slate-100 hover:border-cyan-400"
-                onClick={() => handleExport('pdf')}
+                onClick={() => openReportModal('pdf')}
                 disabled={exportingFormat !== null}
               >
                 <FileDown className="w-4 h-4 mr-2" />
@@ -257,6 +290,50 @@ const Agendamentos = () => {
           </div>
         </div>
       </div>
+
+      <Dialog open={isReportModalOpen} onOpenChange={setIsReportModalOpen}>
+        <DialogContent className="sm:max-w-[420px] bg-slate-900 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle>Periodo do relatorio {reportFormat ? reportFormat.toUpperCase() : ''}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="report-start">Data inicial</Label>
+              <Input
+                id="report-start"
+                type="date"
+                value={reportStartDate}
+                onChange={(event) => setReportStartDate(event.target.value)}
+                className="bg-slate-900 border-slate-700 text-white"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="report-end">Data final</Label>
+              <Input
+                id="report-end"
+                type="date"
+                value={reportEndDate}
+                onChange={(event) => setReportEndDate(event.target.value)}
+                className="bg-slate-900 border-slate-700 text-white"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              className="border-slate-700 text-slate-200 hover:border-cyan-400"
+              onClick={() => setIsReportModalOpen(false)}
+              disabled={exportingFormat !== null}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmReport} disabled={exportingFormat !== null}>
+              {exportingFormat ? 'Gerando...' : `Gerar ${reportFormat ? reportFormat.toUpperCase() : 'relatorio'}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Modal de Novo Agendamento */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

@@ -186,8 +186,15 @@ class ApiClient {
     });
   }
 
-  async downloadAgendamentosReport(format = 'csv') {
-    const url = `${this.baseURL}/agendamentos/report?format=${format}`;
+  async downloadAgendamentosReport(format = 'csv', { startDate, endDate } = {}) {
+    const params = new URLSearchParams({ format });
+    if (startDate) {
+      params.append('start_date', startDate);
+    }
+    if (endDate) {
+      params.append('end_date', endDate);
+    }
+    const url = `${this.baseURL}/agendamentos/report?${params.toString()}`;
     const headers = {};
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;

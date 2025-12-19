@@ -3,7 +3,7 @@ from app import db
 from models.agendamento import Agendamento
 from utils.jwt_utils import token_required, decode_token
 from flask import request as flask_request
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import csv
 import io
@@ -48,7 +48,7 @@ def _agendamento_to_row(agendamento):
         'data_inicio': agendamento.data_inicio.isoformat() if agendamento.data_inicio else '',
         'duracao_minutos': agendamento.duracao_minutos,
         'tipo_recorrencia': agendamento.tipo_recorrencia,
-        'dias_semana': ','.join(agendamento.get_dias_semana_list() or []),
+        'dias_semana': ','.join(str(dia) for dia in (agendamento.get_dias_semana_list() or [])),
         'status': agendamento.status,
         'criado_em': agendamento.criado_em.isoformat() if agendamento.criado_em else '',
     }
@@ -153,8 +153,27 @@ def export_agendamentos():
     """Exporta todos os agendamentos do usuário em CSV ou PDF."""
     user_id = get_user_id()
     export_format = request.args.get('format', 'csv').lower()
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
 
-    agendamentos = Agendamento.query.filter_by(user_id=user_id).order_by(Agendamento.data_inicio.desc()).all()
+    query = Agendamento.query.filter_by(user_id=user_id)
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date)
+        except ValueError:
+            return jsonify({'error': 'Invalid start_date'}), 400
+        query = query.filter(Agendamento.data_inicio >= start_dt)
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date)
+        except ValueError:
+            return jsonify({'error': 'Invalid end_date'}), 400
+        end_dt = end_dt + timedelta(days=1) - timedelta(microseconds=1)
+        query = query.filter(Agendamento.data_inicio <= end_dt)
+    if start_date and end_date and start_dt > end_dt:
+        return jsonify({'error': 'Invalid date range'}), 400
+
+    agendamentos = query.order_by(Agendamento.data_inicio.desc()).all()
     rows = [_agendamento_to_row(a) for a in agendamentos]
     filename_base = f"agendamentos_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 

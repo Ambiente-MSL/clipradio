@@ -420,34 +420,34 @@ const CadastroRadios = () => {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm text-slate-400 mb-1">Bitrate da gravação</label>
+                    <div className="flex flex-col">
+                      <label className="block text-sm text-slate-400 mb-1 h-5">Bitrate da gravação</label>
                       <select
                         value={formData.bitrate_kbps}
                         onChange={(e) => setFormData({ ...formData, bitrate_kbps: Number(e.target.value) })}
-                        className="w-full bg-slate-900/60 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                        className="w-full h-[42px] bg-slate-900/60 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                       >
                         <option value={128}>128 kbps</option>
                         <option value={96}>96 kbps</option>
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-sm text-slate-400 mb-1">Formato do arquivo</label>
+                    <div className="flex flex-col">
+                      <label className="block text-sm text-slate-400 mb-1 h-5">Formato do arquivo</label>
                       <select
                         value={formData.output_format}
                         onChange={(e) => setFormData({ ...formData, output_format: e.target.value })}
-                        className="w-full bg-slate-900/60 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                        className="w-full h-[42px] bg-slate-900/60 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                       >
                         <option value="mp3">MP3</option>
                         <option value="opus">Opus</option>
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-sm text-slate-400 mb-1">Qualidade</label>
+                    <div className="flex flex-col">
+                      <label className="block text-sm text-slate-400 mb-1 h-5">Qualidade</label>
                       <select
                         value={formData.audio_mode}
                         onChange={(e) => setFormData({ ...formData, audio_mode: e.target.value })}
-                        className="w-full bg-slate-900/60 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                        className="w-full h-[42px] bg-slate-900/60 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                       >
                         <option value="stereo">Estéreo</option>
                         <option value="mono">Mono</option>
