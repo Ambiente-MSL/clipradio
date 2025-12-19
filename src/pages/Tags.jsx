@@ -8,7 +8,7 @@ const TagsPage = () => {
   return (
     <>
       <Helmet>
-        <title>Gerenciar Tags - Gestor de Rádios</title>
+        <title>Tags | Clipradio</title>
         <meta name="description" content="Crie, edite e exclua suas tags personalizadas para organizar as gravações." />
       </Helmet>
       <div className="container mx-auto p-4 md:p-6 lg:p-8">
@@ -19,7 +19,7 @@ const TagsPage = () => {
                 <Tag className="w-6 h-6" />
               </div>
               <CardTitle className="text-2xl font-bold gradient-text">
-                Gerenciador de Tags
+                Gerenciador de tags
               </CardTitle>
             </div>
           </CardHeader>

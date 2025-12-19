@@ -27,7 +27,7 @@ function App() {
   return (
     <>
       <Helmet>
-        <title>Gestor de Rádios</title>
+        <title>Clipradio</title>
         <meta
           name="description"
           content="Sistema avançado de gerenciamento de rádios com gravação automática e agendamento inteligente"

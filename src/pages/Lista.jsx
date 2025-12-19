@@ -63,7 +63,7 @@ const Lista = () => {
   return (
     <>
       <Helmet>
-        <title>Lista de Rádios - Gestor de Rádios</title>
+        <title>Rádios | Clipradio</title>
         <meta name="description" content="Veja todas as suas rádios cadastradas em um formato de lista." />
       </Helmet>
       <div className="container mx-auto p-4 md:p-6">

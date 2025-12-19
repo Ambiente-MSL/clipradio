@@ -837,7 +837,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
                 <XCircle className="w-16 h-16 text-slate-600 mx-auto mb-4" />
 
-                <h3 className="text-2xl font-bold text-white mb-2">Nenhuma gravacao agendada encontrada</h3>
+                <h3 className="text-2xl font-bold text-white mb-2">Nenhuma gravação agendada encontrada</h3>
 
                 <p className="text-muted-foreground">Ajuste os filtros ou crie novos agendamentos.</p>
 

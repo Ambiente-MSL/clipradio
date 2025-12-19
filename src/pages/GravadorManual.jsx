@@ -80,7 +80,7 @@ export default function GravadorManual() {
   return (
     <>
       <Helmet>
-        <title>Gravação Manual - Gestor de Rádios</title>
+        <title>Gravar manual | Clipradio</title>
         <meta name="description" content="Inicie uma gravação de rádio manualmente a qualquer momento." />
       </Helmet>
       <motion.div
@@ -175,4 +175,5 @@ export default function GravadorManual() {
       </motion.div>
     </>
   );
-}
+}
+
