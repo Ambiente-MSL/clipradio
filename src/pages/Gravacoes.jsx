@@ -41,6 +41,13 @@ const StatCard = ({ icon, value, unit, delay, gradient }) => (
 
 );
 
+const formatTotalDuration = (totalSeconds) => {
+  const totalMinutes = Math.floor((totalSeconds || 0) / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+};
+
 
 
 const GravacoesStats = ({ stats }) => (
@@ -49,7 +56,7 @@ const GravacoesStats = ({ stats }) => (
 
     <StatCard icon={<Mic className="w-12 h-12 text-cyan-300 mb-3" />} value={stats.totalGravacoes} unit="Gravações" delay={0.1} gradient="from-cyan-600/50 via-cyan-500/30 to-slate-900" />
 
-    <StatCard icon={<Clock className="w-12 h-12 text-emerald-300 mb-3" />} value={(stats.totalDuration / 3600).toFixed(1)} unit="Horas Totais" delay={0.2} gradient="from-emerald-600/50 via-emerald-500/30 to-slate-900" />
+    <StatCard icon={<Clock className="w-12 h-12 text-emerald-300 mb-3" />} value={formatTotalDuration(stats.totalDuration)} unit="Horas Totais" delay={0.2} gradient="from-emerald-600/50 via-emerald-500/30 to-slate-900" />
 
     <StatCard icon={<FileArchive className="w-12 h-12 text-amber-300 mb-3" />} value={(stats.totalSize / 1024).toFixed(1)} unit="GB Totais" delay={0.3} gradient="from-amber-600/40 via-amber-500/20 to-slate-900" />
 
@@ -619,6 +626,14 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
   }, [agendamentos, radios]);
 
   const filteredGravacoes = useMemo(() => [...agAsGravacoes, ...gravacoes], [agAsGravacoes, gravacoes]);
+  const scheduledGravacoes = useMemo(
+    () =>
+      filteredGravacoes.filter((gravacao) => {
+        const tipo = String(gravacao.tipo || '').toLowerCase();
+        return tipo === 'agendado' || gravacao.status === 'agendado';
+      }),
+    [filteredGravacoes]
+  );
   const ongoingGravacoes = useMemo(
     () => ongoingLive.map((g) => ({
       ...g,
@@ -626,6 +641,12 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
     })),
     [ongoingLive, radios]
   );
+
+  const totalCount = activeTab === 'live'
+    ? ongoingGravacoes.length
+    : activeTab === 'agendados'
+      ? scheduledGravacoes.length
+      : filteredGravacoes.length;
 
 
 
@@ -669,6 +690,12 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
             </Button>
 
+            <Button size="sm" variant={activeTab === 'agendados' ? 'default' : 'outline'} onClick={() => setActiveTab('agendados')}>
+
+              Agendados
+
+            </Button>
+
           </div>
 
           <GravacoesStats stats={stats} />
@@ -679,7 +706,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
           <div className="flex items-center justify-between mb-4">
 
-            <div className="text-sm text-muted-foreground">{filteredGravacoes.length} gravações encontradas</div>
+            <div className="text-sm text-muted-foreground">{totalCount} gravações encontradas</div>
 
             <div className="flex gap-2">
 
@@ -780,6 +807,55 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
               </div>
 
             )
+
+          
+          ) : activeTab === 'agendados' ? (
+
+            scheduledGravacoes.length === 0 ? (
+
+              <div className="card text-center py-12">
+
+                <XCircle className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+
+                <h3 className="text-2xl font-bold text-white mb-2">Nenhuma gravacao agendada encontrada</h3>
+
+                <p className="text-muted-foreground">Ajuste os filtros ou crie novos agendamentos.</p>
+
+              </div>
+
+            ) : (
+
+              <div className="space-y-4">
+
+                {scheduledGravacoes.map((gravacao, index) => (
+
+                  <GravacaoItem
+
+                    key={gravacao.id}
+
+                    gravacao={gravacao}
+
+                    index={index}
+
+                    isPlaying={currentPlayingId === gravacao.id}
+
+                    onPlay={() => handlePlay(gravacao.id)}
+
+                    onStop={handleStop}
+
+                    setGlobalAudioTrack={setGlobalAudioTrack}
+
+                    onDelete={handleDeleteLocal}
+
+                    isSelected={selectedIds.has(gravacao.id)}
+
+                    onToggleSelection={toggleSelection}
+
+                  />
+
+                ))}
+
+              </div>
 
           ) : filteredGravacoes.length === 0 ? (
 
