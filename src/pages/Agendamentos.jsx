@@ -189,7 +189,7 @@ const Agendamentos = () => {
   return (
     <>
       <Helmet>
-        <title>Agendamentos</title>
+        <title>Agendamentos | Clipradio</title>
         <meta name="description" content="Gerencie e configure gravações automáticas para suas rádios." />
       </Helmet>
       <div className="min-h-screen p-6">

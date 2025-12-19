@@ -85,7 +85,7 @@ const AdminRelatorios = () => {
   if (loading || isLoading) {
     return (
       <div className="px-6">
-        <Helmet><title>Relatórios - Clipradio</title></Helmet>
+        <Helmet><title>Relatórios | Clipradio</title></Helmet>
         <div className="max-w-6xl mx-auto mt-10 bg-slate-900/60 border border-slate-800 rounded-xl p-8 text-slate-300">
           Carregando relatórios...
         </div>
@@ -96,7 +96,7 @@ const AdminRelatorios = () => {
   return (
     <div className="px-6">
       <Helmet>
-        <title>Relatórios - Clipradio</title>
+        <title>Relatórios | Clipradio</title>
       </Helmet>
 
       <div className="max-w-6xl mx-auto space-y-6">
