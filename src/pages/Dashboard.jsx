@@ -4,7 +4,7 @@ import apiClient from '@/lib/apiClient';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
-import { Radio, Calendar, Download, Loader, LayoutGrid, Plus, Globe, MapPin, Star, StarOff, CheckCircle, AlertCircle } from 'lucide-react';
+import { Radio, Calendar, Download, Loader, Plus, Globe, MapPin, Star, StarOff, CheckCircle, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { Helmet } from 'react-helmet';
 const Dashboard = () => {
   const [stats, setStats] = useState({ radios: 0, agendamentos: 0, gravacoes: 0 });
   const [loadingStats, setLoadingStats] = useState(true);
+  const [activeAgendamentos, setActiveAgendamentos] = useState([]);
   const [formData, setFormData] = useState({
     nome: '',
     stream_url: '',
@@ -39,9 +40,17 @@ const Dashboard = () => {
         apiClient.getGravacoes(),
       ]);
 
+      const ativos = (agendamentosData || []).filter((ag) => ag.status === 'agendado');
+      ativos.sort((a, b) => {
+        const aTime = a?.data_inicio ? new Date(a.data_inicio).getTime() : Number.POSITIVE_INFINITY;
+        const bTime = b?.data_inicio ? new Date(b.data_inicio).getTime() : Number.POSITIVE_INFINITY;
+        return aTime - bTime;
+      });
+      setActiveAgendamentos(ativos);
+
       setStats({
         radios: radiosData?.length || 0,
-        agendamentos: (agendamentosData || []).filter((a) => a.status === 'agendado').length,
+        agendamentos: ativos.length,
         gravacoes: gravacoesData?.length || 0,
       });
     } catch (error) {
@@ -152,6 +161,31 @@ const Dashboard = () => {
     }
     return null;
   };
+
+
+  const formatAgendamentoData = (dateStr) => {
+    if (!dateStr) return 'Data indefinida';
+    const date = new Date(dateStr);
+    if (Number.isNaN(date.getTime())) return 'Data indefinida';
+    const dia = date.toLocaleDateString('pt-BR');
+    const hora = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    return `${dia} ${hora}`;
+  };
+
+  const formatRecorrencia = (agendamento) => {
+    const tipo = (agendamento?.tipo_recorrencia || 'none').toLowerCase();
+    if (tipo === 'daily') return 'Diario';
+    if (tipo === 'weekly') return 'Semanal';
+    if (tipo === 'monthly') return 'Mensal';
+    return 'Unico';
+  };
+
+  const formatDiasSemana = (dias) => {
+    if (!Array.isArray(dias) || dias.length === 0) return '';
+    const mapa = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+    return dias.map((dia) => mapa[dia] || dia).join(', ');
+  };
+
 
   const StatCard = ({ icon, title, value, loading, gradient, iconColor, onNavigate }) => (
     <motion.div whileHover={{ scale: 1.05 }} transition={{ type: 'spring', stiffness: 300 }}>
@@ -358,18 +392,54 @@ const Dashboard = () => {
           {/* Card Painel de Rádios - Direita */}
           <div className="lg:col-span-2">
             <Card className="bg-slate-800/40 border-slate-700/60 h-full">
-              <CardContent className="flex flex-col items-center justify-center h-full p-8 text-center">
-                <LayoutGrid className="w-16 h-16 text-cyan-400 mb-4" />
-                <h2 className="text-2xl font-bold text-white mb-2">Acesse o painel de rádios</h2>
-                <p className="text-slate-400 mb-6 max-w-md">
-                  Controle suas rádios, ouça ao vivo, grave manualmente e veja seus agendamentos.
-                </p>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center text-white">
+                  <Calendar className="w-6 h-6 mr-3 text-emerald-400" />
+                  Agendamentos ativos
+                </CardTitle>
+                <p className="text-xs text-slate-400">{activeAgendamentos.length} ativos no momento</p>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                {loadingStats ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader className="w-6 h-6 animate-spin text-cyan-400" />
+                  </div>
+                ) : activeAgendamentos.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-slate-400">Nenhum agendamento ativo.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {activeAgendamentos.slice(0, 6).map((agendamento) => (
+                      <div
+                        key={agendamento.id}
+                        className="flex items-start justify-between gap-3 border-b border-slate-700/60 pb-3 last:border-b-0 last:pb-0"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-white truncate">{agendamento.radios?.nome || 'Radio'}</p>
+                          <p className="text-xs text-slate-400">
+                            {formatAgendamentoData(agendamento.data_inicio)} - {agendamento.duracao_minutos || 0} min - {formatRecorrencia(agendamento)}
+                            {agendamento.tipo_recorrencia === 'weekly' && agendamento.dias_semana?.length ? ` (${formatDiasSemana(agendamento.dias_semana)})` : ''}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-emerald-300 hover:text-emerald-200"
+                          onClick={() => navigate(`/agendamento/${agendamento.id}`)}
+                        >
+                          Ver
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <Button
-                  className="bg-cyan-500 hover:bg-cyan-600 text-white"
-                  onClick={() => navigate('/cadastro-radios')}
+                  variant="outline"
+                  className="border-slate-700 text-slate-200 hover:border-emerald-400"
+                  onClick={() => navigate('/agendamentos')}
                 >
-                  <LayoutGrid className="w-5 h-5 mr-2" />
-                  Ir para rádios
+                  Ver todos os agendamentos
                 </Button>
               </CardContent>
             </Card>
