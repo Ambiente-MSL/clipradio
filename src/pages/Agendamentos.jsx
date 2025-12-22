@@ -240,7 +240,7 @@ const Agendamentos = () => {
                   {agendamentos.map((agendamento, index) => {
                     const { horario_display, statusInfo, recorrencia_display } = formatAgendamentoDisplay(agendamento);
                     return (
-                    <motion.div key={agendamento.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }} className={`${index % 2 === 0 ? 'bg-slate-800/50' : 'bg-slate-700/30'} rounded-lg p-4 border border-slate-700 hover:border-blue-500/50 transition-all duration-200`}>
+                    <motion.div key={agendamento.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }} className={`${index % 2 === 0 ? 'bg-slate-800/80' : 'bg-slate-900/60'} rounded-lg p-4 border ${index % 2 === 0 ? 'border-slate-600' : 'border-slate-700'} hover:border-blue-500/50 transition-all duration-200`}>
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
