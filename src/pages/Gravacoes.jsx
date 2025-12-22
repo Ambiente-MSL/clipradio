@@ -9,7 +9,7 @@ import { Helmet } from 'react-helmet';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Play, Pause, Download, Trash2, Clock, FileArchive, Mic, Filter, ListFilter, CalendarDays, MapPin, XCircle, Loader, Square } from 'lucide-react';
+import { Play, Pause, Download, Trash2, Clock, FileArchive, Mic, Filter, ListFilter, CalendarDays, MapPin, XCircle, Loader, Square, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -395,6 +395,8 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
   const [activeTab, setActiveTab] = useState('all');
   const [stoppingId, setStoppingId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   const { toast } = useToast();
 
@@ -625,7 +627,12 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
     }));
   }, [agendamentos, radios]);
 
-  const filteredGravacoes = useMemo(() => [...agAsGravacoes, ...gravacoes], [agAsGravacoes, gravacoes]);
+  const filteredGravacoes = useMemo(() => {
+    const combined = [...agAsGravacoes, ...gravacoes];
+    // Ordenar por data mais recente primeiro
+    return combined.sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
+  }, [agAsGravacoes, gravacoes]);
+
   const concludedGravacoes = useMemo(
     () => filteredGravacoes.filter((gravacao) => String(gravacao.status || '').toLowerCase() === 'concluido'),
     [filteredGravacoes]
@@ -662,7 +669,54 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
         ? manualGravacoes.length
       : concludedGravacoes.length;
 
+  // Paginação
+  const getCurrentPageItems = (items) => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return items.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  };
 
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+  const canPrevPage = currentPage > 1;
+  const canNextPage = currentPage < totalPages;
+
+  const paginatedScheduled = useMemo(() => getCurrentPageItems(scheduledGravacoes), [scheduledGravacoes, currentPage]);
+  const paginatedManual = useMemo(() => getCurrentPageItems(manualGravacoes), [manualGravacoes, currentPage]);
+  const paginatedConcluded = useMemo(() => getCurrentPageItems(concludedGravacoes), [concludedGravacoes, currentPage]);
+
+  // Resetar página quando mudar de aba ou filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, filters]);
+
+  const PaginationControls = () => (
+    <div className="flex items-center justify-between text-sm text-muted-foreground py-3 px-4 bg-slate-900/40 rounded-lg border border-slate-800">
+      <span>
+        Página {currentPage} de {totalPages} • {totalCount} gravações
+      </span>
+      <div className="flex items-center gap-2">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8"
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={!canPrevPage}
+          title="Página anterior"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8"
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={!canNextPage}
+          title="Próxima página"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
 
@@ -724,21 +778,15 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
 
 
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-end mb-4 gap-2">
 
-            <div className="text-sm text-muted-foreground">{totalCount} gravações encontradas</div>
+            <Button variant="outline" onClick={clearFilters} size="sm">Limpar filtros</Button>
 
-            <div className="flex gap-2">
+            <Button variant="destructive" onClick={handleDeleteSelected} size="sm" disabled={selectedIds.size === 0 || isDeleting}>
 
-              <Button variant="outline" onClick={clearFilters} size="sm">Limpar filtros</Button>
+              {isDeleting ? 'Excluindo...' : `Excluir Selecionadas (${selectedIds.size})`}
 
-              <Button variant="destructive" onClick={handleDeleteSelected} size="sm" disabled={selectedIds.size === 0 || isDeleting}>
-
-                {isDeleting ? 'Excluindo...' : `Excluir Selecionadas (${selectedIds.size})`}
-
-              </Button>
-
-            </div>
+            </Button>
 
           </div>
 
@@ -845,37 +893,43 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
             ) : (
 
-              <div className="space-y-4">
+              <>
+                <PaginationControls />
 
-                {scheduledGravacoes.map((gravacao, index) => (
+                <div className="space-y-4 my-4">
 
-                  <GravacaoItem
+                  {paginatedScheduled.map((gravacao, index) => (
 
-                    key={gravacao.id}
+                    <GravacaoItem
 
-                    gravacao={gravacao}
+                      key={gravacao.id}
 
-                    index={index}
+                      gravacao={gravacao}
 
-                    isPlaying={currentPlayingId === gravacao.id}
+                      index={index}
 
-                    onPlay={() => handlePlay(gravacao.id)}
+                      isPlaying={currentPlayingId === gravacao.id}
 
-                    onStop={handleStop}
+                      onPlay={() => handlePlay(gravacao.id)}
 
-                    setGlobalAudioTrack={setGlobalAudioTrack}
+                      onStop={handleStop}
 
-                    onDelete={handleDeleteLocal}
+                      setGlobalAudioTrack={setGlobalAudioTrack}
 
-                    isSelected={selectedIds.has(gravacao.id)}
+                      onDelete={handleDeleteLocal}
 
-                    onToggleSelection={toggleSelection}
+                      isSelected={selectedIds.has(gravacao.id)}
 
-                  />
+                      onToggleSelection={toggleSelection}
 
-                ))}
+                    />
 
-              </div>
+                  ))}
+
+                </div>
+
+                <PaginationControls />
+              </>
 
             )
 
@@ -895,9 +949,66 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
             ) : (
 
-              <div className="space-y-4">
+              <>
+                <PaginationControls />
 
-                {manualGravacoes.map((gravacao, index) => (
+                <div className="space-y-4 my-4">
+
+                  {paginatedManual.map((gravacao, index) => (
+
+                    <GravacaoItem
+
+                      key={gravacao.id}
+
+                      gravacao={gravacao}
+
+                      index={index}
+
+                      isPlaying={currentPlayingId === gravacao.id}
+
+                      onPlay={() => handlePlay(gravacao.id)}
+
+                      onStop={handleStop}
+
+                      setGlobalAudioTrack={setGlobalAudioTrack}
+
+                      onDelete={handleDeleteLocal}
+
+                      isSelected={selectedIds.has(gravacao.id)}
+
+                      onToggleSelection={toggleSelection}
+
+                    />
+
+                  ))}
+
+                </div>
+
+                <PaginationControls />
+              </>
+
+            )
+
+          ) : concludedGravacoes.length === 0 ? (
+
+            <div className="card text-center py-12">
+
+              <XCircle className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+
+              <h3 className="text-2xl font-bold text-white mb-2">Nenhuma gravação encontrada</h3>
+
+              <p className="text-muted-foreground">Ajuste os filtros ou realize novas gravações.</p>
+
+            </div>
+
+          ) : (
+
+            <>
+              <PaginationControls />
+
+              <div className="space-y-4 my-4">
+
+                {paginatedConcluded.map((gravacao, index) => (
 
                   <GravacaoItem
 
@@ -927,53 +1038,8 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
               </div>
 
-            )
-
-          ) : concludedGravacoes.length === 0 ? (
-
-            <div className="card text-center py-12">
-
-              <XCircle className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-
-              <h3 className="text-2xl font-bold text-white mb-2">Nenhuma gravação encontrada</h3>
-
-              <p className="text-muted-foreground">Ajuste os filtros ou realize novas gravações.</p>
-
-            </div>
-
-          ) : (
-
-            <div className="space-y-4">
-
-              {concludedGravacoes.map((gravacao, index) => (
-
-                <GravacaoItem
-
-                  key={gravacao.id}
-
-                  gravacao={gravacao}
-
-                  index={index}
-
-                  isPlaying={currentPlayingId === gravacao.id}
-
-                  onPlay={() => handlePlay(gravacao.id)}
-
-                  onStop={handleStop}
-
-                  setGlobalAudioTrack={setGlobalAudioTrack}
-
-                  onDelete={handleDeleteLocal}
-
-                  isSelected={selectedIds.has(gravacao.id)}
-
-                  onToggleSelection={toggleSelection}
-
-                />
-
-              ))}
-
-            </div>
+              <PaginationControls />
+            </>
 
           )}
 
