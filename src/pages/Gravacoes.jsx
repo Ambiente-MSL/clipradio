@@ -88,6 +88,34 @@ const GravacoesFilter = ({ filters, setFilters, radios }) => {
 
         <div>
 
+          <label htmlFor="filterEstado" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por Estado</label>
+
+          <div className="relative">
+
+            <input id="filterEstado" name="estado" type="text" placeholder="Digite o estado (UF)..." value={filters.estado} onChange={handleFilterChange} className="input pr-10" />
+
+            <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+
+          </div>
+
+        </div>
+
+        <div>
+
+          <label htmlFor="filterCidade" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por Cidade</label>
+
+          <div className="relative">
+
+            <input id="filterCidade" name="cidade" type="text" placeholder="Digite a cidade..." value={filters.cidade} onChange={handleFilterChange} className="input pr-10" />
+
+            <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+
+          </div>
+
+        </div>
+
+        <div>
+
           <label htmlFor="filterRadio" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por rádio</label>
 
           <div className="relative">
@@ -119,34 +147,6 @@ const GravacoesFilter = ({ filters, setFilters, radios }) => {
             <input id="filterDate" name="data" type="date" value={filters.data} onChange={handleFilterChange} className="input appearance-none pr-10" />
 
             <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-
-          </div>
-
-        </div>
-
-        <div>
-
-          <label htmlFor="filterCidade" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por Cidade</label>
-
-          <div className="relative">
-
-            <input id="filterCidade" name="cidade" type="text" placeholder="Digite a cidade..." value={filters.cidade} onChange={handleFilterChange} className="input pr-10" />
-
-            <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-
-          </div>
-
-        </div>
-
-        <div>
-
-          <label htmlFor="filterEstado" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por Estado</label>
-
-          <div className="relative">
-
-            <input id="filterEstado" name="estado" type="text" placeholder="Digite o estado (UF)..." value={filters.estado} onChange={handleFilterChange} className="input pr-10" />
-
-            <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
 
           </div>
 
