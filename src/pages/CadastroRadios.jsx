@@ -577,7 +577,7 @@ const CadastroRadios = () => {
                     </div>
                   ) : filteredRadios.length === 0 ? (
                     <div className="text-center py-12 text-slate-400">
-                      {showFavoritesOnly ? 'Nenhuma radio favorita encontrada.' : 'Nenhuma radio cadastrada ainda.'}
+                      {showFavoritesOnly ? 'Nenhuma rádio favorita encontrada.' : 'Nenhuma radio cadastrada ainda.'}
                     </div>
                   ) : viewMode === 'card' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
