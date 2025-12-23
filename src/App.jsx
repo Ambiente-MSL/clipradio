@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
 import Navbar from '@/components/Navbar';
@@ -19,6 +19,8 @@ import SystemStatus from '@/pages/SystemStatus';
 import Admin from '@/pages/Admin';
 
 function App() {
+  const location = useLocation();
+  const isLoginRoute = location.pathname === '/login';
   const [globalAudioTrack, setGlobalAudioTrack] = useState(null);
   const [playerRadio, setPlayerRadio] = useState(null);
   const [playerVolume, setPlayerVolume] = useState(1);
@@ -33,14 +35,14 @@ function App() {
         />
       </Helmet>
 
-      <div className="min-h-screen pb-24">
-        <Navbar />
+      <div className={isLoginRoute ? 'min-h-screen' : 'min-h-screen pb-24'}>
+        {!isLoginRoute && <Navbar />}
 
         <motion.main
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5 }}
-          className="pt-32"
+          className={isLoginRoute ? 'min-h-screen' : 'pt-32'}
         >
           <Routes>
             <Route path="/login" element={<Login />} />
