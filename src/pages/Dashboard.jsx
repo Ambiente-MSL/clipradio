@@ -429,7 +429,7 @@ const Dashboard = () => {
                         <Input
                           value={formData.cidade}
                           onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
-                          placeholder="São Paulo"
+                          placeholder="Ex: Fortaleza"
                         />
                         <Globe className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                       </div>
@@ -441,7 +441,7 @@ const Dashboard = () => {
                           maxLength={2}
                           value={formData.estado}
                           onChange={(e) => setFormData({ ...formData, estado: e.target.value.toUpperCase() })}
-                          placeholder="SP"
+                          placeholder="Ex: CE"
                         />
                         <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                       </div>

@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LogOut, User, LayoutDashboard, Radio, Calendar, FileText, Mic, Tag, CircleDot, X, BarChart3, Shield } from 'lucide-react';
+import { LogOut, User, LayoutDashboard, Radio, Calendar, FileText, Mic, Tag, CircleDot, X, Shield } from 'lucide-react';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { Button } from '@/components/ui/button';
 import Logo from '@/components/Logo';
@@ -16,7 +16,6 @@ const baseNavItems = [
   { name: 'Tags', path: '/tags', icon: Tag },
 ];
 const adminNavItems = [
-  { name: 'Relatórios', path: '/admin-relatorios', icon: BarChart3 },
   { name: 'Admin', path: '/admin', icon: Shield },
 ];
 
