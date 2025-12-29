@@ -24,6 +24,28 @@ const resolveFileUrl = (url) => {
   return `${API_ORIGIN}/${url}`;
 };
 
+const extractExtension = (value) => {
+  const match = String(value || '').match(/\.([a-z0-9]+)(?:\?.*)?$/i);
+  return match ? `.${match[1].toLowerCase()}` : '';
+};
+
+const buildDownloadName = (gravacao, audioUrl) => {
+  const radioName = String(gravacao?.radios?.nome || 'gravacao');
+  const createdAt = gravacao?.criado_em ? new Date(gravacao.criado_em) : null;
+  const dateStamp = createdAt && !Number.isNaN(createdAt.getTime())
+    ? format(createdAt, 'yyyy-MM-dd_HH-mm-ss')
+    : 'sem-data';
+  const rawBase = `${radioName}_${dateStamp}`;
+  const normalized = rawBase.normalize ? rawBase.normalize('NFD') : rawBase;
+  const safeBase = normalized
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 120) || 'gravacao';
+  const extension = extractExtension(audioUrl) || extractExtension(gravacao?.arquivo_nome) || '.mp3';
+  return `${safeBase}${extension}`;
+};
+
 
 const StatCard = ({ icon, value, unit, delay, gradient }) => (
 
@@ -273,9 +295,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
       a.style.display = 'none';
 
       a.href = url;
-      const suggestedName = (gravacao.arquivo_nome || (audioUrl ? audioUrl.split('/').pop() : '') || '').trim();
-      const baseName = suggestedName || `gravacao_${gravacao.id}`;
-      const downloadName = baseName.includes('.') ? baseName : `${baseName}.mp3`;
+      const downloadName = buildDownloadName(gravacao, audioUrl);
       a.download = downloadName;
 
       document.body.appendChild(a);
