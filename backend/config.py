@@ -48,6 +48,13 @@ class Config:
     # Storage
     STORAGE_PATH = os.path.join(os.path.dirname(__file__), 'storage')
     UPLOAD_PATH = os.path.join(os.path.dirname(__file__), 'uploads')
+
+    # Dropbox (opcional) - arquivamento de áudios para economizar disco
+    DROPBOX_UPLOAD_ENABLED = os.getenv('DROPBOX_UPLOAD_ENABLED', 'false').lower() == 'true'
+    DROPBOX_ACCESS_TOKEN = os.getenv('DROPBOX_ACCESS_TOKEN')
+    DROPBOX_AUDIO_PATH = os.getenv('DROPBOX_AUDIO_PATH', '/clipradio/audio')
+    DROPBOX_DELETE_LOCAL_AFTER_UPLOAD = os.getenv('DROPBOX_DELETE_LOCAL_AFTER_UPLOAD', 'true').lower() == 'true'
+    DROPBOX_LOCAL_RETENTION_DAYS = int(os.getenv('DROPBOX_LOCAL_RETENTION_DAYS', '0') or 0)
     
     @staticmethod
     def init_app(app):

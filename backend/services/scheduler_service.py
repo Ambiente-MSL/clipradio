@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import os
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -56,8 +57,71 @@ def init_scheduler(app=None):
                 id="ag_cleanup",
                 replace_existing=True,
             )
+            # Job diário para limpar áudio local já arquivado no Dropbox (opcional)
+            if app_obj.config.get("DROPBOX_UPLOAD_ENABLED") and (app_obj.config.get("DROPBOX_LOCAL_RETENTION_DAYS") or 0) > 0:
+                scheduler.add_job(
+                    cleanup_local_audio_archived,
+                    CronTrigger(hour=3, minute=30, timezone=LOCAL_TZ),
+                    id="dropbox_audio_cleanup",
+                    replace_existing=True,
+                )
     except Exception as e:
         print(f"Erro ao carregar agendamentos: {e}")
+
+
+def cleanup_local_audio_archived():
+    """
+    Remove arquivos locais em storage/audio que já foram arquivados no Dropbox e
+    excederam o período de retenção local (DROPBOX_LOCAL_RETENTION_DAYS).
+
+    Para evitar perder dados quando o upload falha, só remove quando existe o marcador:
+      <arquivo>.dropbox
+    """
+    app_obj = _capture_scheduler_app()
+    if not app_obj:
+        return
+
+    try:
+        with app_obj.app_context():
+            retention_days = int(app_obj.config.get("DROPBOX_LOCAL_RETENTION_DAYS") or 0)
+            if retention_days <= 0:
+                return
+
+            storage_path = app_obj.config.get("STORAGE_PATH")
+            if not storage_path:
+                return
+            audio_dir = os.path.join(storage_path, "audio")
+            if not os.path.isdir(audio_dir):
+                return
+
+            cutoff = datetime.now(tz=LOCAL_TZ) - timedelta(days=retention_days)
+            for name in os.listdir(audio_dir):
+                if not name or name.endswith(".dropbox"):
+                    continue
+                file_path = os.path.join(audio_dir, name)
+                if not os.path.isfile(file_path):
+                    continue
+                marker_path = f"{file_path}.dropbox"
+                if not os.path.exists(marker_path):
+                    continue
+                try:
+                    mtime = datetime.fromtimestamp(os.path.getmtime(file_path), tz=LOCAL_TZ)
+                    if mtime <= cutoff:
+                        try:
+                            os.remove(file_path)
+                        except Exception:
+                            pass
+                        try:
+                            os.remove(marker_path)
+                        except Exception:
+                            pass
+                except Exception:
+                    continue
+    except Exception as e:
+        try:
+            print(f"cleanup_local_audio_archived falhou: {e}")
+        except Exception:
+            pass
 
 
 def _normalized_run_date(dt):
