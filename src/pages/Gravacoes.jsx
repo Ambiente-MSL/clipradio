@@ -635,7 +635,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 
   return (
 
-    <motion.div layout initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -50, scale: 0.9 }} transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', stiffness: 120 }} className={`card-item flex flex-col p-4 gap-4 transition-all duration-300 ${isSelected ? 'bg-primary/10 border-primary' : 'border-transparent'}`}>
+    <motion.div layout="position" initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -50, scale: 0.9 }} transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', stiffness: 120 }} className={`card-item flex flex-col p-4 gap-4 transition-colors duration-200 ${isSelected ? 'bg-primary/10 border-primary' : 'border-transparent'}`}>
 
       <div className="flex items-center w-full gap-4">
 
@@ -687,8 +687,9 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
       </div>
 
       {isTranscriptionOpen && (
-        <div className="w-full border-t border-slate-800/60 pt-4 text-sm text-slate-200">
-          <div className="flex flex-wrap items-center gap-2 mb-3">
+        <div className="w-full rounded-lg border border-slate-800/70 bg-slate-950/40 p-4 text-sm text-slate-200">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex flex-wrap items-center gap-2">
             <Button
               size="sm"
               onClick={handleStartTranscription}
@@ -728,12 +729,13 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
             >
               Copiar transcrição
             </Button>
-            <div className="text-xs text-muted-foreground ml-auto">Progresso: {progressValue}%</div>
+            </div>
+            <div className="text-xs text-muted-foreground lg:ml-auto">Progresso: {progressValue}%</div>
           </div>
-          <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
+          <div className="mt-3 h-2 w-full rounded-full bg-slate-800/80 overflow-hidden">
             <div className="h-full bg-emerald-400 transition-all duration-300" style={{ width: `${progressValue}%` }} />
           </div>
-          <div className="mt-3">
+          <div className="mt-4 rounded-md bg-slate-900/60 p-3 max-h-60 overflow-y-auto">
             {transcriptionData.status === 'interrompendo' ? (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader className="w-4 h-4 animate-spin" />
