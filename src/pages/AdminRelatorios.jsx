@@ -68,7 +68,7 @@ const AdminRelatorios = () => {
     },
     {
       title: 'Quem mais agenda',
-      value: stats?.top_scheduler?.nome || 'Sem dados',
+      value: stats?.top_scheduler?.nome || 'Sem dados.',
       helper: stats?.top_scheduler ? `${stats.top_scheduler.total_agendamentos} agendamentos` : 'Nenhum agendamento ainda',
       icon: <CalendarClock className="w-5 h-5 text-amber-300" />,
       gradient: 'from-amber-600/40 via-amber-500/20 to-slate-900',
