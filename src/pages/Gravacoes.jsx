@@ -375,12 +375,15 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
         progresso: data?.progresso ?? 0,
       });
 
-      if (!data?.texto && gravacao.status === 'concluido' && data?.status !== 'processando') {
-        const started = await apiClient.startTranscricao(gravacao.id);
+      const shouldStart = gravacao.status === 'concluido' && !data?.texto;
+      const stuckAtZero = ['processando', 'fila'].includes(data?.status) && (data?.progresso ?? 0) <= 0;
+      const forceStart = ['erro', 'interrompido'].includes(data?.status) || stuckAtZero;
+      if (shouldStart) {
+        const started = await apiClient.startTranscricao(gravacao.id, { force: forceStart });
         setTranscriptionData((prev) => ({
           ...prev,
-          status: started?.status || 'processando',
-          progresso: 0,
+          status: started?.status || (forceStart ? 'processando' : prev.status) || 'processando',
+          progresso: prev.progresso ?? 0,
         }));
       }
     } catch (error) {
