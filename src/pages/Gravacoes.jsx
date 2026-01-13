@@ -235,9 +235,7 @@ const GravacoesFilter = ({ filters, setFilters, radios, estadoOptions, cidadeOpt
 
       </div>
 
-      </div>
-
-    </motion.div>
+      </motion.div>
 
   );
 
