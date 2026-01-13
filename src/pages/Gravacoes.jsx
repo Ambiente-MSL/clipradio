@@ -632,6 +632,9 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
   };
 
   const progressValue = Math.min(100, Math.max(0, Number(transcriptionData.progresso || 0)));
+  const elapsedSeconds = gravacao?.duracao_segundos
+    ? Math.round((gravacao.duracao_segundos * progressValue) / 100)
+    : null;
 
   return (
 
@@ -730,7 +733,9 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
               Copiar transcrição
             </Button>
             </div>
-            <div className="text-xs text-muted-foreground lg:ml-auto">Progresso: {progressValue}%</div>
+            <div className="text-xs text-muted-foreground lg:ml-auto">
+              Progresso: {progressValue}% | Tempo percorrido: {elapsedSeconds !== null ? formatDuration(elapsedSeconds) : '--:--'}
+            </div>
           </div>
           <div className="mt-3 h-2 w-full rounded-full bg-slate-800/80 overflow-hidden">
             <div className="h-full bg-emerald-400 transition-all duration-300" style={{ width: `${progressValue}%` }} />
