@@ -25,6 +25,43 @@ def _get_audio_filepath(gravacao):
     return os.path.join(Config.STORAGE_PATH, "audio", filename)
 
 
+def _resolve_audio_filepath(gravacao):
+    filepath = _resolve_audio_filepath(gravacao)
+    if filepath and os.path.exists(filepath):
+        return filepath
+    if not gravacao or not gravacao.id:
+        return filepath
+    audio_dir = os.path.join(Config.STORAGE_PATH, "audio")
+    if not os.path.isdir(audio_dir):
+        return filepath
+    prefix = f"{gravacao.id}_"
+    try:
+        candidates = [
+            name for name in os.listdir(audio_dir)
+            if name.startswith(prefix)
+        ]
+    except Exception:
+        candidates = []
+    if not candidates:
+        return filepath
+    candidates.sort(
+        key=lambda name: os.path.getmtime(os.path.join(audio_dir, name)),
+        reverse=True,
+    )
+    candidate_name = candidates[0]
+    candidate_path = os.path.join(audio_dir, candidate_name)
+    if os.path.exists(candidate_path):
+        if not gravacao.arquivo_nome:
+            gravacao.arquivo_nome = candidate_name
+            gravacao.arquivo_url = f"/api/files/audio/{candidate_name}"
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+        return candidate_path
+    return filepath
+
+
 def _load_model():
     global _MODEL
     if _MODEL is not None:
@@ -116,9 +153,6 @@ def transcribe_gravacao(gravacao_id, *, force=False):
     if not gravacao:
         return False
 
-    if gravacao.status != "concluido" and not force:
-        return False
-
     if gravacao.transcricao_texto and not force:
         return True
 
@@ -134,6 +168,27 @@ def transcribe_gravacao(gravacao_id, *, force=False):
             progresso=gravacao.transcricao_progresso or 0,
         )
         return False
+    try:
+        file_size = os.path.getsize(filepath)
+    except Exception:
+        file_size = 0
+    if file_size < 1024 and not force:
+        _commit_transcription(
+            gravacao,
+            status="erro",
+            erro="arquivo_de_audio_invalido",
+            progresso=gravacao.transcricao_progresso or 0,
+        )
+        return False
+
+    if (gravacao.duracao_segundos or 0) <= 0:
+        probed_duration = _probe_duration_seconds(filepath) or 0
+        if probed_duration > 0:
+            gravacao.duracao_segundos = probed_duration
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
 
     _commit_transcription(
         gravacao,
@@ -209,12 +264,15 @@ def transcribe_gravacao(gravacao_id, *, force=False):
         parts = []
         last_progress = gravacao.transcricao_progresso or 0
         last_text_end = 0.0
+        text_update_seconds = max(1, int(Config.TRANSCRIBE_TEXT_UPDATE_SECONDS or 10))
 
         _commit_transcription(
             gravacao,
             status="processando",
-            progresso=last_progress,
+            progresso=last_progress or 1,
         )
+        if last_progress == 0:
+            last_progress = 1
 
         for segment in segments:
             text = (segment.text or "").strip()
@@ -230,7 +288,7 @@ def transcribe_gravacao(gravacao_id, *, force=False):
             else:
                 progress = min(99, last_progress + 1)
 
-            text_update = segment_end and (segment_end - last_text_end) >= 15
+            text_update = segment_end and (segment_end - last_text_end) >= text_update_seconds
             progress_update = progress > last_progress
             if progress_update or text_update:
                 texto_parcial = " ".join(parts).strip() if text_update else None

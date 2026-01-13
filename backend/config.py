@@ -66,6 +66,7 @@ class Config:
     TRANSCRIBE_VAD = os.getenv('TRANSCRIBE_VAD', 'true').lower() == 'true'
     TRANSCRIBE_VAD_MIN_SILENCE_MS = int(os.getenv('TRANSCRIBE_VAD_MIN_SILENCE_MS', '500') or 500)
     TRANSCRIBE_CHUNK_LENGTH = int(os.getenv('TRANSCRIBE_CHUNK_LENGTH', '15') or 15)
+    TRANSCRIBE_TEXT_UPDATE_SECONDS = int(os.getenv('TRANSCRIBE_TEXT_UPDATE_SECONDS', '10') or 10)
     
     @staticmethod
     def init_app(app):
