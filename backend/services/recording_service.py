@@ -143,6 +143,17 @@ def _finalizar_gravacao(gravacao, status, filepath=None, duration_seconds=None, 
     if agendamento:
         broadcast_update(f'user_{gravacao.user_id}', 'agendamento_updated', agendamento.to_dict())
 
+    # Iniciar transcricao local apos concluir a gravacao.
+    try:
+        if status == 'concluido' and Config.TRANSCRIBE_ENABLED:
+            from services.transcription_service import start_transcription
+            start_transcription(gravacao.id)
+    except Exception as exc:
+        try:
+            current_app.logger.exception(f"Falha ao iniciar transcricao: {exc}")
+        except Exception:
+            pass
+
     # Arquivar para Dropbox (opcional). Mantém URLs iguais (/api/files/audio/<arquivo>)
     try:
         if status == 'concluido':
@@ -161,7 +172,10 @@ def _finalizar_gravacao(gravacao, status, filepath=None, duration_seconds=None, 
                     except Exception:
                         pass
 
-                if dropbox_cfg.delete_local_after_upload and dropbox_cfg.local_retention_days <= 0:
+                should_delete_local = dropbox_cfg.delete_local_after_upload and dropbox_cfg.local_retention_days <= 0
+                if Config.TRANSCRIBE_ENABLED and gravacao.transcricao_status != 'concluido':
+                    should_delete_local = False
+                if should_delete_local:
                     try:
                         os.remove(filepath)
                     except Exception:

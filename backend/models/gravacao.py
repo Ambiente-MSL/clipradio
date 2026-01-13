@@ -18,6 +18,11 @@ class Gravacao(db.Model):
     duracao_segundos = db.Column(db.Integer, default=0)
     duracao_minutos = db.Column(db.Integer, default=0)
     tamanho_mb = db.Column(db.Float, default=0.0)
+    transcricao_status = db.Column(db.String(50))
+    transcricao_texto = db.Column(db.Text)
+    transcricao_erro = db.Column(db.String(500))
+    transcricao_idioma = db.Column(db.String(20))
+    transcricao_modelo = db.Column(db.String(100))
     batch_id = db.Column(db.String(36))  # Para gravação em massa
     # Guardar timestamps com timezone para evitar deslocamento de hora
     criado_em = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(tz=LOCAL_TZ), index=True)
@@ -27,7 +32,7 @@ class Gravacao(db.Model):
     clips = db.relationship('Clip', backref='gravacao', lazy=True, cascade='all, delete-orphan')
     tags = db.relationship('Tag', secondary='gravacoes_tags', lazy='subquery', backref=db.backref('gravacoes', lazy=True))
     
-    def to_dict(self, include_radio=False):
+    def to_dict(self, include_radio=False, include_transcricao=False):
         data = {
             'id': self.id,
             'user_id': self.user_id,
@@ -43,6 +48,14 @@ class Gravacao(db.Model):
             'criado_em': self.criado_em.isoformat() if self.criado_em else None,
             'atualizado_em': self.atualizado_em.isoformat() if self.atualizado_em else None
         }
+
+        data['transcricao_status'] = self.transcricao_status
+        data['transcricao_disponivel'] = bool(self.transcricao_texto)
+        data['transcricao_erro'] = self.transcricao_erro
+        data['transcricao_idioma'] = self.transcricao_idioma
+        data['transcricao_modelo'] = self.transcricao_modelo
+        if include_transcricao:
+            data['transcricao_texto'] = self.transcricao_texto
         
         if include_radio and self.radio:
             data['radios'] = {
