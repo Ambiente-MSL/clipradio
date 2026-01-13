@@ -67,6 +67,12 @@ const buildDownloadName = (gravacao, audioUrl) => {
   return `${safeBase}${extension}`;
 };
 
+const buildTranscriptionDownloadName = (gravacao, audioUrl) => {
+  const audioName = buildDownloadName(gravacao, audioUrl);
+  const baseName = audioName.replace(/\.[^.]+$/, '');
+  return `${baseName}.txt`;
+};
+
 
 const StatCard = ({ icon, value, unit, delay, gradient }) => (
 
@@ -354,9 +360,6 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
   };
 
   const handleToggleTranscription = async () => {
-    const nextOpen = !isTranscriptionOpen;
-    setIsTranscriptionOpen(nextOpen);
-    if (!nextOpen) return;
 
     if (!gravacao?.arquivo_url) {
       toast({ title: 'Transcrição indisponível', description: 'O arquivo desta gravação não foi encontrado.', variant: 'destructive' });
@@ -364,6 +367,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
     }
 
     if (!gravacao?.id) return;
+    setIsTranscriptionOpen(true);
 
     setIsTranscriptionLoading(true);
     try {
@@ -393,6 +397,129 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
     }
   };
 
+
+
+  const handleStartTranscription = async () => {
+    if (!gravacao?.arquivo_url) {
+      toast({ title: 'Transcrição indisponível', description: 'O arquivo desta gravação não foi encontrado.', variant: 'destructive' });
+      return;
+    }
+
+    if (!gravacao?.id) return;
+
+    setIsTranscriptionOpen(true);
+    setIsTranscriptionLoading(true);
+    try {
+      const data = await apiClient.getTranscricao(gravacao.id);
+      setTranscriptionData({
+        status: data?.status || null,
+        texto: data?.texto || '',
+        erro: data?.erro || null,
+        progresso: data?.progresso ?? 0,
+      });
+
+      if (gravacao.status !== 'concluido') {
+        toast({ title: 'Transcrição indisponível', description: 'A transcrição fica disponível após a gravação concluir.' });
+        return;
+      }
+
+      if (['processando', 'fila', 'interrompendo'].includes(data?.status)) {
+        toast({ title: 'Transcrição em andamento', description: 'Aguarde a conclusão ou use Parar para interromper.' });
+        return;
+      }
+
+      if (data?.texto && data?.status === 'concluido') {
+        toast({ title: 'Transcrição já concluída', description: 'Use Reprocessar se quiser gerar novamente.' });
+        return;
+      }
+
+      const started = await apiClient.startTranscricao(gravacao.id, { force: false });
+      setTranscriptionData((prev) => ({
+        ...prev,
+        status: started?.status || 'processando',
+        progresso: prev.progresso ?? 0,
+      }));
+    } catch (error) {
+      toast({ title: 'Erro ao iniciar transcrição', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsTranscriptionLoading(false);
+    }
+  };
+
+  const handleReprocessTranscription = async () => {
+    if (!gravacao?.arquivo_url) {
+      toast({ title: 'Transcrição indisponível', description: 'O arquivo desta gravação não foi encontrado.', variant: 'destructive' });
+      return;
+    }
+
+    if (!gravacao?.id) return;
+
+    setIsTranscriptionOpen(true);
+    setIsTranscriptionLoading(true);
+    try {
+      if (gravacao.status !== 'concluido') {
+        toast({ title: 'Transcrição indisponível', description: 'A transcrição fica disponível após a gravação concluir.' });
+        return;
+      }
+
+      const started = await apiClient.startTranscricao(gravacao.id, { force: true });
+      setTranscriptionData((prev) => ({
+        ...prev,
+        status: started?.status || 'processando',
+        texto: '',
+        erro: null,
+        progresso: 0,
+      }));
+    } catch (error) {
+      toast({ title: 'Erro ao reprocessar transcrição', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsTranscriptionLoading(false);
+    }
+  };
+
+  const handleDownloadTranscription = () => {
+    if (!transcriptionData.texto) {
+      toast({ title: 'Transcrição vazia', description: 'Nenhum texto para baixar ainda.' });
+      return;
+    }
+    const audioUrl = resolveFileUrl(gravacao.arquivo_url, gravacao.arquivo_nome);
+    const filename = buildTranscriptionDownloadName(gravacao, audioUrl);
+    const blob = new Blob([transcriptionData.texto], { type: 'text/plain;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    toast({ title: 'Download iniciado', description: 'O texto da transcrição está sendo baixado.' });
+  };
+
+  const handleCopyTranscription = async () => {
+    if (!transcriptionData.texto) {
+      toast({ title: 'Transcrição vazia', description: 'Nenhum texto para copiar ainda.' });
+      return;
+    }
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(transcriptionData.texto);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = transcriptionData.texto;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      toast({ title: 'Transcrição copiada', description: 'Texto copiado para a área de transferência.' });
+    } catch (error) {
+      toast({ title: 'Erro ao copiar transcrição', description: error.message, variant: 'destructive' });
+    }
+  };
   const handleStopTranscription = async () => {
     if (!gravacao?.id) return;
     setTranscriptionData((prev) => ({
@@ -540,13 +667,16 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 
         </div>
 
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
 
           <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${statusColors[gravacao.status] || statusColors.agendado}`}>{statusText[gravacao.status] || 'Desconhecido'}</span>
 
           <Button size="icon" variant="ghost" onClick={handleDownload} disabled={!gravacao.arquivo_url}><Download className="w-5 h-5" /></Button>
+          <Button size="sm" variant="outline" onClick={handleStartTranscription} disabled={!gravacao.arquivo_url}>
+            <FileText className="w-4 h-4 mr-2" />
+            Transcrever
+          </Button>
 
-          <Button size="icon" variant="ghost" onClick={handleToggleTranscription} disabled={!gravacao.arquivo_url} title="Transcricao"><FileText className={`w-5 h-5 ${isTranscriptionOpen ? 'text-primary' : ''}`} /></Button>
 
           <AlertDialog><AlertDialogTrigger asChild><Button size="icon" variant="ghost" className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90"><Trash2 className="w-5 h-5" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Você tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. Isso excluira permanentemente a gravação e todos os dados associados.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={isDeleting}>{isDeleting ? 'Excluindo...' : 'Sim, Excluir'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 
@@ -558,8 +688,22 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 
       {isTranscriptionOpen && (
         <div className="w-full border-t border-slate-800/60 pt-4 text-sm text-slate-200">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div className="text-xs text-muted-foreground">Progresso: {progressValue}%</div>
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <Button
+              size="sm"
+              onClick={handleStartTranscription}
+              disabled={isTranscriptionLoading || gravacao.status !== 'concluido'}
+            >
+              Transcrever
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleReprocessTranscription}
+              disabled={isTranscriptionLoading || gravacao.status !== 'concluido'}
+            >
+              Reprocessar
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -568,6 +712,23 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
             >
               Parar
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleDownloadTranscription}
+              disabled={!transcriptionData.texto}
+            >
+              Baixar texto
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleCopyTranscription}
+              disabled={!transcriptionData.texto}
+            >
+              Copiar transcrição
+            </Button>
+            <div className="text-xs text-muted-foreground ml-auto">Progresso: {progressValue}%</div>
           </div>
           <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
             <div className="h-full bg-emerald-400 transition-all duration-300" style={{ width: `${progressValue}%` }} />
