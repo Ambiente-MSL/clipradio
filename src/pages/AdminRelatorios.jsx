@@ -37,7 +37,7 @@ const AdminRelatorios = () => {
       setStats(data);
     } catch (error) {
       toast({
-        title: 'Falha ao carregar relatórios',
+        title: 'Falha ao carregar relatórios.',
         description: error.message,
         variant: 'destructive',
       });
