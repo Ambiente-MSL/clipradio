@@ -140,6 +140,12 @@ class ApiClient {
     });
   }
 
+  async stopTranscricao(gravacaoId) {
+    return this.request(`/gravacoes/${gravacaoId}/transcricao/stop`, {
+      method: 'POST',
+    });
+  }
+
   async createGravacao(data) {
     return this.request('/gravacoes', {
       method: 'POST',

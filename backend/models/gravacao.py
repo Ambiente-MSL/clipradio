@@ -23,6 +23,8 @@ class Gravacao(db.Model):
     transcricao_erro = db.Column(db.String(500))
     transcricao_idioma = db.Column(db.String(20))
     transcricao_modelo = db.Column(db.String(100))
+    transcricao_progresso = db.Column(db.Integer)
+    transcricao_cancelada = db.Column(db.Boolean, default=False)
     batch_id = db.Column(db.String(36))  # Para gravação em massa
     # Guardar timestamps com timezone para evitar deslocamento de hora
     criado_em = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(tz=LOCAL_TZ), index=True)
@@ -54,6 +56,8 @@ class Gravacao(db.Model):
         data['transcricao_erro'] = self.transcricao_erro
         data['transcricao_idioma'] = self.transcricao_idioma
         data['transcricao_modelo'] = self.transcricao_modelo
+        data['transcricao_progresso'] = self.transcricao_progresso
+        data['transcricao_cancelada'] = self.transcricao_cancelada
         if include_transcricao:
             data['transcricao_texto'] = self.transcricao_texto
         

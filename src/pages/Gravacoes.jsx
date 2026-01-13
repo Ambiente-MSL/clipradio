@@ -254,6 +254,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
     status: gravacao?.transcricao_status || null,
     texto: gravacao?.transcricao_texto || '',
     erro: gravacao?.transcricao_erro || null,
+    progresso: gravacao?.transcricao_progresso ?? 0,
   });
 
   useEffect(() => {
@@ -262,8 +263,9 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
       status: gravacao?.transcricao_status ?? prev.status,
       erro: gravacao?.transcricao_erro ?? prev.erro,
       texto: prev.texto || gravacao?.transcricao_texto || '',
+      progresso: gravacao?.transcricao_progresso ?? prev.progresso ?? 0,
     }));
-  }, [gravacao?.transcricao_status, gravacao?.transcricao_erro, gravacao?.transcricao_texto]);
+  }, [gravacao?.transcricao_status, gravacao?.transcricao_erro, gravacao?.transcricao_texto, gravacao?.transcricao_progresso]);
 
 
 
@@ -357,7 +359,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
     if (!nextOpen) return;
 
     if (!gravacao?.arquivo_url) {
-      toast({ title: 'Transcricao indisponivel', description: 'O arquivo desta gravacao nao foi encontrado.', variant: 'destructive' });
+      toast({ title: 'Transcrição indisponível', description: 'O arquivo desta gravação não foi encontrado.', variant: 'destructive' });
       return;
     }
 
@@ -370,6 +372,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
         status: data?.status || null,
         texto: data?.texto || '',
         erro: data?.erro || null,
+        progresso: data?.progresso ?? 0,
       });
 
       if (!data?.texto && gravacao.status === 'concluido' && data?.status !== 'processando') {
@@ -377,14 +380,61 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
         setTranscriptionData((prev) => ({
           ...prev,
           status: started?.status || 'processando',
+          progresso: 0,
         }));
       }
     } catch (error) {
-      toast({ title: 'Erro ao carregar transcricao', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao carregar transcrição', description: error.message, variant: 'destructive' });
     } finally {
       setIsTranscriptionLoading(false);
     }
   };
+
+  const handleStopTranscription = async () => {
+    if (!gravacao?.id) return;
+    setIsTranscriptionLoading(true);
+    try {
+      const data = await apiClient.stopTranscricao(gravacao.id);
+      setTranscriptionData((prev) => ({
+        ...prev,
+        status: data?.status || 'interrompendo',
+      }));
+    } catch (error) {
+      toast({ title: 'Erro ao parar transcricao', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsTranscriptionLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isTranscriptionOpen) return;
+    if (!gravacao?.id) return;
+    if (!['processando', 'interrompendo'].includes(transcriptionData.status)) return;
+    let active = true;
+    const fetchStatus = async () => {
+      try {
+        const data = await apiClient.getTranscricao(gravacao.id);
+        if (!active) return;
+        setTranscriptionData((prev) => ({
+          ...prev,
+          status: data?.status || prev.status,
+          texto: data?.texto || prev.texto,
+          erro: data?.erro || prev.erro,
+          progresso: data?.progresso ?? prev.progresso ?? 0,
+        }));
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Erro ao atualizar transcricao', error);
+        }
+      }
+    };
+    fetchStatus();
+    const timer = setInterval(fetchStatus, 3000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [isTranscriptionOpen, transcriptionData.status, gravacao?.id]);
 
 
 
@@ -450,7 +500,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 
   };
 
-
+  const progressValue = Math.min(100, Math.max(0, Number(transcriptionData.progresso || 0)));
 
   return (
 
@@ -504,27 +554,50 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 
       {isTranscriptionOpen && (
         <div className="w-full border-t border-slate-800/60 pt-4 text-sm text-slate-200">
-          {isTranscriptionLoading ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader className="w-4 h-4 animate-spin" />
-              Carregando transcricao...
-            </div>
-          ) : transcriptionData.texto ? (
-            <p className="whitespace-pre-wrap leading-relaxed">{transcriptionData.texto}</p>
-          ) : transcriptionData.status === 'processando' ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader className="w-4 h-4 animate-spin" />
-              Transcricao em processamento...
-            </div>
-          ) : transcriptionData.status === 'erro' ? (
-            <div className="text-destructive">
-              Falha ao transcrever. {transcriptionData.erro ? `Motivo: ${transcriptionData.erro}` : ''}
-            </div>
-          ) : gravacao.status !== 'concluido' ? (
-            <div className="text-muted-foreground">Transcricao disponivel apos a conclusao.</div>
-          ) : (
-            <div className="text-muted-foreground">Transcricao pendente. Clique novamente para atualizar.</div>
-          )}
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="text-xs text-muted-foreground">Progresso: {progressValue}%</div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleStopTranscription}
+              disabled={isTranscriptionLoading || transcriptionData.status !== 'processando'}
+            >
+              Parar
+            </Button>
+          </div>
+          <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
+            <div className="h-full bg-emerald-400 transition-all duration-300" style={{ width: `${progressValue}%` }} />
+          </div>
+          <div className="mt-3">
+            {isTranscriptionLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader className="w-4 h-4 animate-spin" />
+                Carregando transcrição...
+              </div>
+            ) : transcriptionData.texto ? (
+              <p className="whitespace-pre-wrap leading-relaxed">{transcriptionData.texto}</p>
+            ) : transcriptionData.status === 'interrompendo' ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader className="w-4 h-4 animate-spin" />
+                Parando transcrição...
+              </div>
+            ) : transcriptionData.status === 'processando' ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader className="w-4 h-4 animate-spin" />
+                Transcrição em processamento...
+              </div>
+            ) : transcriptionData.status === 'interrompido' ? (
+              <div className="text-muted-foreground">Transcrição interrompida.</div>
+            ) : transcriptionData.status === 'erro' ? (
+              <div className="text-destructive">
+                Falha ao transcrever. {transcriptionData.erro ? `Motivo: ${transcriptionData.erro}` : ''}
+              </div>
+            ) : gravacao.status !== 'concluido' ? (
+              <div className="text-muted-foreground">Transcrição disponível após a conclusão.</div>
+            ) : (
+              <div className="text-muted-foreground">Transcrição pendente. Clique novamente para atualizar.</div>
+            )}
+          </div>
         </div>
       )}
 
@@ -844,6 +917,8 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
       transcricao_status: null,
       transcricao_disponivel: false,
       transcricao_erro: null,
+      transcricao_progresso: 0,
+      transcricao_cancelada: false,
     }));
   }, [agendamentos, radios]);
 

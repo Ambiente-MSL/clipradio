@@ -57,11 +57,14 @@ class Config:
     DROPBOX_LOCAL_RETENTION_DAYS = int(os.getenv('DROPBOX_LOCAL_RETENTION_DAYS', '0') or 0)
 
     TRANSCRIBE_ENABLED = os.getenv('TRANSCRIBE_ENABLED', 'true').lower() == 'true'
-    TRANSCRIBE_MODEL = os.getenv('TRANSCRIBE_MODEL', 'small')
+    TRANSCRIBE_MODEL = os.getenv('TRANSCRIBE_MODEL', 'tiny')
     TRANSCRIBE_LANGUAGE = os.getenv('TRANSCRIBE_LANGUAGE', 'pt')
     TRANSCRIBE_DEVICE = os.getenv('TRANSCRIBE_DEVICE', 'cpu')
     TRANSCRIBE_COMPUTE_TYPE = os.getenv('TRANSCRIBE_COMPUTE_TYPE', 'int8')
-    TRANSCRIBE_BEAM_SIZE = int(os.getenv('TRANSCRIBE_BEAM_SIZE', '5') or 5)
+    TRANSCRIBE_BEAM_SIZE = int(os.getenv('TRANSCRIBE_BEAM_SIZE', '1') or 1)
+    TRANSCRIBE_BEST_OF = int(os.getenv('TRANSCRIBE_BEST_OF', '1') or 1)
+    TRANSCRIBE_VAD = os.getenv('TRANSCRIBE_VAD', 'true').lower() == 'true'
+    TRANSCRIBE_VAD_MIN_SILENCE_MS = int(os.getenv('TRANSCRIBE_VAD_MIN_SILENCE_MS', '500') or 500)
     
     @staticmethod
     def init_app(app):

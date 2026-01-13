@@ -281,7 +281,27 @@ def gravacao_transcricao(gravacao_id):
         'erro': gravacao.transcricao_erro,
         'idioma': gravacao.transcricao_idioma,
         'modelo': gravacao.transcricao_modelo,
+        'progresso': gravacao.transcricao_progresso,
+        'cancelada': gravacao.transcricao_cancelada,
     }), 200
+
+
+@bp.route('/<gravacao_id>/transcricao/stop', methods=['POST'])
+@token_required
+def gravacao_transcricao_stop(gravacao_id):
+    ctx = get_user_ctx()
+    is_admin = ctx.get('is_admin', False)
+    gravacao = Gravacao.query.filter_by(id=gravacao_id).first()
+    if not gravacao:
+        return jsonify({'error': 'Gravacao not found'}), 404
+    if not is_admin and not _gravacao_access_allowed(gravacao, ctx):
+        return jsonify({'error': 'Gravacao not found'}), 404
+
+    from services.transcription_service import request_transcription_stop
+    stopped = request_transcription_stop(gravacao.id)
+    if not stopped:
+        return jsonify({'id': gravacao.id, 'status': gravacao.transcricao_status}), 200
+    return jsonify({'id': gravacao.id, 'status': gravacao.transcricao_status}), 200
 
 @bp.route('/<gravacao_id>', methods=['DELETE'])
 @token_required
