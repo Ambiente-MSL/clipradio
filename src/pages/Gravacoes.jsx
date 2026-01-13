@@ -9,7 +9,7 @@ import { Helmet } from 'react-helmet';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useLocation } from 'react-router-dom';
-import { Play, Pause, Download, Trash2, Clock, FileArchive, Mic, Filter, ListFilter, CalendarDays, MapPin, XCircle, Loader, Square, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Pause, Download, Trash2, Clock, FileArchive, FileText, Mic, Filter, ListFilter, CalendarDays, MapPin, XCircle, Loader, Square, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -248,6 +248,22 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
   const { toast } = useToast();
 
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isTranscriptionOpen, setIsTranscriptionOpen] = useState(false);
+  const [isTranscriptionLoading, setIsTranscriptionLoading] = useState(false);
+  const [transcriptionData, setTranscriptionData] = useState({
+    status: gravacao?.transcricao_status || null,
+    texto: gravacao?.transcricao_texto || '',
+    erro: gravacao?.transcricao_erro || null,
+  });
+
+  useEffect(() => {
+    setTranscriptionData((prev) => ({
+      ...prev,
+      status: gravacao?.transcricao_status ?? prev.status,
+      erro: gravacao?.transcricao_erro ?? prev.erro,
+      texto: prev.texto || gravacao?.transcricao_texto || '',
+    }));
+  }, [gravacao?.transcricao_status, gravacao?.transcricao_erro, gravacao?.transcricao_texto]);
 
 
 
@@ -335,6 +351,41 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 
   };
 
+  const handleToggleTranscription = async () => {
+    const nextOpen = !isTranscriptionOpen;
+    setIsTranscriptionOpen(nextOpen);
+    if (!nextOpen) return;
+
+    if (!gravacao?.arquivo_url) {
+      toast({ title: 'Transcricao indisponivel', description: 'O arquivo desta gravacao nao foi encontrado.', variant: 'destructive' });
+      return;
+    }
+
+    if (!gravacao?.id) return;
+
+    setIsTranscriptionLoading(true);
+    try {
+      const data = await apiClient.getTranscricao(gravacao.id);
+      setTranscriptionData({
+        status: data?.status || null,
+        texto: data?.texto || '',
+        erro: data?.erro || null,
+      });
+
+      if (!data?.texto && gravacao.status === 'concluido' && data?.status !== 'processando') {
+        const started = await apiClient.startTranscricao(gravacao.id);
+        setTranscriptionData((prev) => ({
+          ...prev,
+          status: started?.status || 'processando',
+        }));
+      }
+    } catch (error) {
+      toast({ title: 'Erro ao carregar transcricao', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsTranscriptionLoading(false);
+    }
+  };
+
 
 
   const handleDelete = async () => {
@@ -403,11 +454,13 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 
   return (
 
-    <motion.div layout initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -50, scale: 0.9 }} transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', stiffness: 120 }} className={`card-item flex items-center p-4 gap-4 transition-all duration-300 ${isSelected ? 'bg-primary/10 border-primary' : 'border-transparent'}`}>
+    <motion.div layout initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -50, scale: 0.9 }} transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', stiffness: 120 }} className={`card-item flex flex-col p-4 gap-4 transition-all duration-300 ${isSelected ? 'bg-primary/10 border-primary' : 'border-transparent'}`}>
 
-      <div className="flex items-center"><Checkbox checked={isSelected} onCheckedChange={() => onToggleSelection(gravacao.id)} className="mr-4" /><Button size="icon" variant="ghost" className="rounded-full w-14 h-14" onClick={handlePlay}>{isPlaying ? <Pause className="w-6 h-6 text-primary" /> : <Play className="w-6 h-6 text-primary" />}</Button></div>
+      <div className="flex items-center w-full gap-4">
 
-      <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex items-center"><Checkbox checked={isSelected} onCheckedChange={() => onToggleSelection(gravacao.id)} className="mr-4" /><Button size="icon" variant="ghost" className="rounded-full w-14 h-14" onClick={handlePlay}>{isPlaying ? <Pause className="w-6 h-6 text-primary" /> : <Play className="w-6 h-6 text-primary" />}</Button></div>
+
+        <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-4">
 
         <div className="flex flex-col">
 
@@ -439,11 +492,39 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 
           <Button size="icon" variant="ghost" onClick={handleDownload} disabled={!gravacao.arquivo_url}><Download className="w-5 h-5" /></Button>
 
+          <Button size="icon" variant="ghost" onClick={handleToggleTranscription} disabled={!gravacao.arquivo_url} title="Transcricao"><FileText className={`w-5 h-5 ${isTranscriptionOpen ? 'text-primary' : ''}`} /></Button>
+
           <AlertDialog><AlertDialogTrigger asChild><Button size="icon" variant="ghost" className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90"><Trash2 className="w-5 h-5" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Você tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. Isso excluira permanentemente a gravação e todos os dados associados.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={isDeleting}>{isDeleting ? 'Excluindo...' : 'Sim, Excluir'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 
         </div>
 
       </div>
+
+      {isTranscriptionOpen && (
+        <div className="w-full border-t border-slate-800/60 pt-4 text-sm text-slate-200">
+          {isTranscriptionLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader className="w-4 h-4 animate-spin" />
+              Carregando transcricao...
+            </div>
+          ) : transcriptionData.texto ? (
+            <p className="whitespace-pre-wrap leading-relaxed">{transcriptionData.texto}</p>
+          ) : transcriptionData.status === 'processando' ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader className="w-4 h-4 animate-spin" />
+              Transcricao em processamento...
+            </div>
+          ) : transcriptionData.status === 'erro' ? (
+            <div className="text-destructive">
+              Falha ao transcrever. {transcriptionData.erro ? `Motivo: ${transcriptionData.erro}` : ''}
+            </div>
+          ) : gravacao.status !== 'concluido' ? (
+            <div className="text-muted-foreground">Transcricao disponivel apos a conclusao.</div>
+          ) : (
+            <div className="text-muted-foreground">Transcricao pendente. Clique novamente para atualizar.</div>
+          )}
+        </div>
+      )}
 
     </motion.div>
 
@@ -758,6 +839,9 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
       tamanho_mb: 0,
       tipo: 'agendado',
       arquivo_url: null,
+      transcricao_status: null,
+      transcricao_disponivel: false,
+      transcricao_erro: null,
     }));
   }, [agendamentos, radios]);
 

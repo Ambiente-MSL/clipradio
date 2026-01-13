@@ -251,6 +251,38 @@ def get_gravacao(gravacao_id):
     gravacao = hydrate_gravacao_metadata(gravacao, autocommit=True)
     return jsonify(gravacao.to_dict(include_radio=True)), 200
 
+
+@bp.route('/<gravacao_id>/transcricao', methods=['GET', 'POST'])
+@token_required
+def gravacao_transcricao(gravacao_id):
+    ctx = get_user_ctx()
+    is_admin = ctx.get('is_admin', False)
+    gravacao = Gravacao.query.filter_by(id=gravacao_id).first()
+    if not gravacao:
+        return jsonify({'error': 'Gravacao not found'}), 404
+    if not is_admin and not _gravacao_access_allowed(gravacao, ctx):
+        return jsonify({'error': 'Gravacao not found'}), 404
+
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        force = bool(data.get('force'))
+        from services.transcription_service import start_transcription
+        start_transcription(gravacao.id, force=force)
+        try:
+            db.session.refresh(gravacao)
+        except Exception:
+            pass
+        return jsonify({'id': gravacao.id, 'status': gravacao.transcricao_status}), 202
+
+    return jsonify({
+        'id': gravacao.id,
+        'status': gravacao.transcricao_status,
+        'texto': gravacao.transcricao_texto,
+        'erro': gravacao.transcricao_erro,
+        'idioma': gravacao.transcricao_idioma,
+        'modelo': gravacao.transcricao_modelo,
+    }), 200
+
 @bp.route('/<gravacao_id>', methods=['DELETE'])
 @token_required
 def delete_gravacao(gravacao_id):

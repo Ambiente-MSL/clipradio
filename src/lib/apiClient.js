@@ -129,6 +129,17 @@ class ApiClient {
     return this.request(`/gravacoes/${id}`);
   }
 
+  async getTranscricao(gravacaoId) {
+    return this.request(`/gravacoes/${gravacaoId}/transcricao`);
+  }
+
+  async startTranscricao(gravacaoId, { force = false } = {}) {
+    return this.request(`/gravacoes/${gravacaoId}/transcricao`, {
+      method: 'POST',
+      body: JSON.stringify({ force }),
+    });
+  }
+
   async createGravacao(data) {
     return this.request('/gravacoes', {
       method: 'POST',

@@ -143,6 +143,49 @@ def _finalizar_gravacao(gravacao, status, filepath=None, duration_seconds=None, 
     if agendamento:
         broadcast_update(f'user_{gravacao.user_id}', 'agendamento_updated', agendamento.to_dict())
 
+    # Iniciar transcricao local apos concluir a gravacao.
+    try:
+        if status == 'concluido' and Config.TRANSCRIBE_ENABLED:
+            from services.transcription_service import start_transcription
+            start_transcription(gravacao.id)
+    except Exception as exc:
+        try:
+            current_app.logger.exception(f"Falha ao iniciar transcricao: {exc}")
+        except Exception:
+            pass
+
+    # Arquivar para Dropbox (opcional). Mantém URLs iguais (/api/files/audio/<arquivo>)
+    try:
+        if status == 'concluido':
+            from services.dropbox_service import build_remote_audio_path, get_dropbox_config, upload_file
+
+            dropbox_cfg = get_dropbox_config()
+            if dropbox_cfg.is_ready and filepath and os.path.exists(filepath):
+                remote_path = build_remote_audio_path(os.path.basename(filepath), base_path=dropbox_cfg.audio_path)
+                upload_file(filepath, remote_path, token=dropbox_cfg.access_token)
+
+                if dropbox_cfg.local_retention_days > 0:
+                    try:
+                        marker_path = f"{filepath}.dropbox"
+                        with open(marker_path, "w", encoding="utf-8") as fp:
+                            fp.write(remote_path)
+                    except Exception:
+                        pass
+
+                should_delete_local = dropbox_cfg.delete_local_after_upload and dropbox_cfg.local_retention_days <= 0
+                if Config.TRANSCRIBE_ENABLED and gravacao.transcricao_status != 'concluido':
+                    should_delete_local = False
+                if should_delete_local:
+                    try:
+                        os.remove(filepath)
+                    except Exception:
+                        pass
+    except Exception as exc:
+        try:
+            current_app.logger.exception(f"Falha ao arquivar gravação no Dropbox: {exc}")
+        except Exception:
+            pass
+
 
 def start_recording(gravacao, *, duration_seconds=None, agendamento=None, block=False):
     """Inicia gravação de um stream de rádio.
@@ -317,9 +360,6 @@ def process_audio_with_ai(gravacao, palavras_chave):
     # Atualizar status
     gravacao.status = 'processando'
     db.session.commit()
-    
-    # Aqui você implementaria a lógica de processamento com IA
-    # Por enquanto, retornamos uma resposta mock
     
     # Exemplo: criar clipes baseados em palavras-chave
     clips = []
