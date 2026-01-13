@@ -392,7 +392,10 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 
   const handleStopTranscription = async () => {
     if (!gravacao?.id) return;
-    setIsTranscriptionLoading(true);
+    setTranscriptionData((prev) => ({
+      ...prev,
+      status: 'interrompendo',
+    }));
     try {
       const data = await apiClient.stopTranscricao(gravacao.id);
       setTranscriptionData((prev) => ({
@@ -401,15 +404,13 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
       }));
     } catch (error) {
       toast({ title: 'Erro ao parar transcricao', description: error.message, variant: 'destructive' });
-    } finally {
-      setIsTranscriptionLoading(false);
     }
   };
 
   useEffect(() => {
     if (!isTranscriptionOpen) return;
     if (!gravacao?.id) return;
-    if (!['processando', 'interrompendo'].includes(transcriptionData.status)) return;
+    if (!['processando', 'interrompendo', 'fila'].includes(transcriptionData.status)) return;
     let active = true;
     const fetchStatus = async () => {
       try {
@@ -560,7 +561,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
               size="sm"
               variant="outline"
               onClick={handleStopTranscription}
-              disabled={isTranscriptionLoading || transcriptionData.status !== 'processando'}
+              disabled={isTranscriptionLoading || !['processando', 'fila'].includes(transcriptionData.status)}
             >
               Parar
             </Button>
@@ -569,18 +570,20 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
             <div className="h-full bg-emerald-400 transition-all duration-300" style={{ width: `${progressValue}%` }} />
           </div>
           <div className="mt-3">
-            {isTranscriptionLoading ? (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader className="w-4 h-4 animate-spin" />
-                Carregando transcrição...
-              </div>
-            ) : transcriptionData.texto ? (
-              <p className="whitespace-pre-wrap leading-relaxed">{transcriptionData.texto}</p>
-            ) : transcriptionData.status === 'interrompendo' ? (
+            {transcriptionData.status === 'interrompendo' ? (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader className="w-4 h-4 animate-spin" />
                 Parando transcrição...
               </div>
+            ) : transcriptionData.texto ? (
+              <p className="whitespace-pre-wrap leading-relaxed">{transcriptionData.texto}</p>
+            ) : isTranscriptionLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader className="w-4 h-4 animate-spin" />
+                Carregando transcrição...
+              </div>
+            ) : transcriptionData.status === 'fila' ? (
+              <div className="text-muted-foreground">Transcrição na fila. Aguarde...</div>
             ) : transcriptionData.status === 'processando' ? (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader className="w-4 h-4 animate-spin" />

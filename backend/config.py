@@ -65,6 +65,7 @@ class Config:
     TRANSCRIBE_BEST_OF = int(os.getenv('TRANSCRIBE_BEST_OF', '1') or 1)
     TRANSCRIBE_VAD = os.getenv('TRANSCRIBE_VAD', 'true').lower() == 'true'
     TRANSCRIBE_VAD_MIN_SILENCE_MS = int(os.getenv('TRANSCRIBE_VAD_MIN_SILENCE_MS', '500') or 500)
+    TRANSCRIBE_CHUNK_LENGTH = int(os.getenv('TRANSCRIBE_CHUNK_LENGTH', '15') or 15)
     
     @staticmethod
     def init_app(app):
