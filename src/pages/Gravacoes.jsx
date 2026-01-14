@@ -157,7 +157,7 @@ const GravacoesFilter = ({ filters, setFilters, radios, estadoOptions, cidadeOpt
 
         <div>
 
-          <label htmlFor="filterEstado" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por Estado</label>
+          <label htmlFor="filterEstado" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por estado</label>
 
           <div className="relative">
 
@@ -176,7 +176,7 @@ const GravacoesFilter = ({ filters, setFilters, radios, estadoOptions, cidadeOpt
 
         <div>
 
-          <label htmlFor="filterCidade" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por Cidade</label>
+          <label htmlFor="filterCidade" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por cidade</label>
 
           <div className="relative">
 
@@ -219,7 +219,7 @@ const GravacoesFilter = ({ filters, setFilters, radios, estadoOptions, cidadeOpt
 
         <div>
 
-          <label htmlFor="filterDate" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por Data</label>
+          <label htmlFor="filterDate" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por data</label>
 
           <div className="relative cursor-pointer" onClick={handleDatePickerClick}>
 
@@ -703,7 +703,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 
           <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${statusColors[gravacao.status] || statusColors.agendado}`}>{statusText[gravacao.status] || 'Desconhecido'}</span>
 
-          <Button size="icon" variant="ghost" onClick={handleDownload} disabled={!gravacao.arquivo_url}><Download className="w-5 h-5" /></Button>
+          <Button size="icon" variant="ghost" className="h-9 w-9" onClick={handleDownload} disabled={!gravacao.arquivo_url}><Download className="w-5 h-5" /></Button>
           <Button size="sm" variant="outline" onClick={handleStartTranscription} disabled={!gravacao.arquivo_url}>
             <FileText className="w-4 h-4 mr-2" />
             Transcrever
@@ -711,6 +711,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
           <Button
             size="icon"
             variant="ghost"
+            className="h-9 w-9"
             onClick={handleToggleTranscription}
             disabled={!gravacao.arquivo_url && !isTranscriptionOpen}
             title={isTranscriptionOpen ? 'Recolher transcricao' : 'Abrir transcricao'}
@@ -719,7 +720,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
           </Button>
 
 
-          <AlertDialog><AlertDialogTrigger asChild><Button size="icon" variant="ghost" className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90"><Trash2 className="w-5 h-5" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Você tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. Isso excluira permanentemente a gravação e todos os dados associados.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={isDeleting}>{isDeleting ? 'Excluindo...' : 'Sim, Excluir'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+          <AlertDialog><AlertDialogTrigger asChild><Button size="icon" variant="ghost" className="h-9 w-9 text-destructive hover:text-destructive-foreground hover:bg-destructive/90"><Trash2 className="w-5 h-5" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Você tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. Isso excluira permanentemente a gravação e todos os dados associados.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={isDeleting}>{isDeleting ? 'Excluindo...' : 'Sim, Excluir'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 
         </div>
 
@@ -842,9 +843,14 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
   const initialRadioId = searchParams.get('radioId') || 'all';
 
-
-
   const [filters, setFilters] = useState({ radioId: initialRadioId, data: '', cidade: '', estado: '' });
+  const [currentPlayingId, setCurrentPlayingId] = useState(null);
+
+  useEffect(() => {
+    const handleGlobalAudioClosed = () => setCurrentPlayingId(null);
+    window.addEventListener('global-audio-closed', handleGlobalAudioClosed);
+    return () => window.removeEventListener('global-audio-closed', handleGlobalAudioClosed);
+  }, []);
 
   const estadoOptions = useMemo(() => {
     const estadoSet = new Set();
@@ -870,8 +876,6 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
     });
     return Array.from(cidadeSet).sort((a, b) => a.localeCompare(b));
   }, [radios, filters.estado]);
-
-  const [currentPlayingId, setCurrentPlayingId] = useState(null);
 
   const [selectedIds, setSelectedIds] = useState(new Set());
 

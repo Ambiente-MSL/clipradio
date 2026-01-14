@@ -14,7 +14,7 @@ const GravacoesFilter = ({ filters, setFilters, radios }) => {
       <h2 className="text-2xl font-bold text-foreground flex items-center mb-5"><Filter className="w-6 h-6 mr-3 text-purple-400" />Filtros</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div>
-          <label htmlFor="filterRadio" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por Rádio</label>
+          <label htmlFor="filterRadio" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por rádio</label>
           <div className="relative">
             <select
               id="filterRadio"
@@ -32,7 +32,7 @@ const GravacoesFilter = ({ filters, setFilters, radios }) => {
           </div>
         </div>
         <div>
-          <label htmlFor="filterDate" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por Data</label>
+          <label htmlFor="filterDate" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por data</label>
           <div className="relative">
             <input
               id="filterDate"
@@ -46,7 +46,7 @@ const GravacoesFilter = ({ filters, setFilters, radios }) => {
           </div>
         </div>
         <div>
-          <label htmlFor="filterCidade" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por Cidade</label>
+          <label htmlFor="filterCidade" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por cidade</label>
           <div className="relative">
             <input
               id="filterCidade"
@@ -61,7 +61,7 @@ const GravacoesFilter = ({ filters, setFilters, radios }) => {
           </div>
         </div>
         <div>
-          <label htmlFor="filterEstado" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por Estado</label>
+          <label htmlFor="filterEstado" className="block text-sm font-medium text-muted-foreground mb-2">Filtrar por estado</label>
           <div className="relative">
             <input
               id="filterEstado"

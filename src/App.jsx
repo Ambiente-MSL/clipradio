@@ -64,7 +64,12 @@ function App() {
 
         <GlobalAudioPlayer
           track={globalAudioTrack}
-          onClose={() => setGlobalAudioTrack(null)}
+          onClose={() => {
+            setGlobalAudioTrack(null);
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('global-audio-closed'));
+            }
+          }}
         />
       </div>
     </>
