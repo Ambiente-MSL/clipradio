@@ -665,6 +665,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
   const isStalled = idleSeconds !== null
     && idleSeconds >= 90
     && ['processando', 'fila'].includes(transcriptionData.status);
+  const hasTranscription = transcriptionData.status === 'concluido' && Boolean(transcriptionData.texto);
   return (
 
     <motion.div layout="position" initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -50, scale: 0.9 }} transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', stiffness: 120 }} className={`card-item flex flex-col p-4 gap-4 transition-colors duration-200 ${isSelected ? 'bg-primary/10 border-primary' : 'border-transparent'}`}>
@@ -704,7 +705,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
           <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${statusColors[gravacao.status] || statusColors.agendado}`}>{statusText[gravacao.status] || 'Desconhecido'}</span>
 
           <Button size="icon" variant="ghost" className="h-9 w-9" onClick={handleStartTranscription} disabled={!gravacao.arquivo_url} title="Transcrever">
-            <FileText className="w-5 h-5" />
+            <FileText className={`w-5 h-5 ${hasTranscription ? 'text-emerald-400' : 'text-white'}`} />
           </Button>
           <Button
             size="icon"
