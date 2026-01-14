@@ -88,7 +88,7 @@ def create_gravacao():
 
     radio_id = data.get('radio_id')
     if not radio_id:
-        return jsonify({'error': 'radio_id is required'}), 400
+        return jsonify({'error': 'O campo radio_id é obrigatório'}), 400
 
 
     gravacao = Gravacao(
@@ -245,9 +245,9 @@ def get_gravacao(gravacao_id):
     is_admin = ctx.get('is_admin', False)
     gravacao = Gravacao.query.filter_by(id=gravacao_id).first()
     if not gravacao:
-        return jsonify({'error': 'Gravacao not found'}), 404
+        return jsonify({'error': 'Gravação não encontrada'}), 404
     if not is_admin and not _gravacao_access_allowed(gravacao, ctx):
-        return jsonify({'error': 'Gravacao not found'}), 404
+        return jsonify({'error': 'Gravação não encontrada'}), 404
     gravacao = hydrate_gravacao_metadata(gravacao, autocommit=True)
     return jsonify(gravacao.to_dict(include_radio=True)), 200
 
@@ -259,9 +259,9 @@ def gravacao_transcricao(gravacao_id):
     is_admin = ctx.get('is_admin', False)
     gravacao = Gravacao.query.filter_by(id=gravacao_id).first()
     if not gravacao:
-        return jsonify({'error': 'Gravacao not found'}), 404
+        return jsonify({'error': 'Gravação não encontrada'}), 404
     if not is_admin and not _gravacao_access_allowed(gravacao, ctx):
-        return jsonify({'error': 'Gravacao not found'}), 404
+        return jsonify({'error': 'Gravação não encontrada'}), 404
 
     if request.method == 'POST':
         data = request.get_json() or {}
@@ -293,9 +293,9 @@ def gravacao_transcricao_stop(gravacao_id):
     is_admin = ctx.get('is_admin', False)
     gravacao = Gravacao.query.filter_by(id=gravacao_id).first()
     if not gravacao:
-        return jsonify({'error': 'Gravacao not found'}), 404
+        return jsonify({'error': 'Gravação não encontrada'}), 404
     if not is_admin and not _gravacao_access_allowed(gravacao, ctx):
-        return jsonify({'error': 'Gravacao not found'}), 404
+        return jsonify({'error': 'Gravação não encontrada'}), 404
 
     from services.transcription_service import request_transcription_stop
     stopped = request_transcription_stop(gravacao.id)
@@ -311,9 +311,9 @@ def delete_gravacao(gravacao_id):
     is_admin = ctx.get('is_admin', False)
     gravacao = Gravacao.query.filter_by(id=gravacao_id).first()
     if not gravacao:
-        return jsonify({'error': 'Gravacao not found'}), 404
+        return jsonify({'error': 'Gravação não encontrada'}), 404
     if not is_admin and not _gravacao_access_allowed(gravacao, ctx):
-        return jsonify({'error': 'Gravacao not found'}), 404
+        return jsonify({'error': 'Gravação não encontrada'}), 404
     
     db.session.delete(gravacao)
     db.session.commit()
@@ -322,7 +322,7 @@ def delete_gravacao(gravacao_id):
     from services.websocket_service import broadcast_update
     broadcast_update(f'user_{user_id}', 'gravacao_deleted', {'id': gravacao_id})
     
-    return jsonify({'message': 'Gravacao deleted'}), 200
+    return jsonify({'message': 'Gravação excluída'}), 200
 
 @bp.route('/batch-delete', methods=['POST'])
 @token_required
@@ -334,7 +334,7 @@ def batch_delete():
     gravacao_ids = data.get('gravacao_ids', [])
     
     if not gravacao_ids:
-        return jsonify({'error': 'No gravacao IDs provided'}), 400
+        return jsonify({'error': 'Nenhum ID de gravação informado'}), 400
     
     gravacoes = Gravacao.query.filter(Gravacao.id.in_(gravacao_ids))
     if not is_admin:
@@ -351,7 +351,7 @@ def batch_delete():
     from services.websocket_service import broadcast_update
     broadcast_update(f'user_{user_id}', 'gravacoes_deleted', {'ids': gravacao_ids})
     
-    return jsonify({'message': f'{len(gravacoes)} gravacoes deleted'}), 200
+    return jsonify({'message': f'{len(gravacoes)} gravações excluídas'}), 200
 
 @bp.route('/stats', methods=['GET'])
 @token_required
@@ -389,7 +389,7 @@ def admin_quick_stats():
     """Retorna indicadores rápidos para admins."""
     ctx = get_user_ctx()
     if not ctx.get('is_admin'):
-        return jsonify({'error': 'Forbidden'}), 403
+        return jsonify({'error': 'Acesso negado'}), 403
 
     # Base de gravações válidas (ignora erros)
     duration_expr = db.func.coalesce(Gravacao.duracao_segundos, Gravacao.duracao_minutos * 60)

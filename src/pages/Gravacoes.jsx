@@ -283,7 +283,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 
     if (!gravacao.arquivo_url) {
 
-      toast({ title: 'Audio indisponível', description: 'O arquivo desta gravação não foi encontrado.', variant: 'destructive' });
+      toast({ title: 'Áudio indisponível', description: 'O arquivo desta gravação não foi encontrado.', variant: 'destructive' });
 
       return;
 
@@ -330,7 +330,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 
       const audioUrl = resolveFileUrl(gravacao.arquivo_url, gravacao.arquivo_nome);
       if (!audioUrl) {
-        toast({ title: "Download indisponÇðvel", description: "O arquivo desta gravação não foi encontrado.", variant: 'destructive' });
+        toast({ title: "Download indisponível", description: "O arquivo desta gravação não foi encontrado.", variant: 'destructive' });
         return;
       }
       const response = await fetch(audioUrl);
@@ -353,11 +353,11 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 
       window.URL.revokeObjectURL(url);
 
-      toast({ title: "Download Iniciado", description: "O arquivo de áudio esta sendo baixado." });
+      toast({ title: "Download iniciado", description: "O arquivo de áudio está sendo baixado." });
 
     } catch (error) {
 
-      toast({ title: "Erro no Download", description: error.message, variant: 'destructive' });
+      toast({ title: "Erro no download", description: error.message, variant: 'destructive' });
 
     }
 
@@ -543,7 +543,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
       const data = await apiClient.stopTranscricao(gravacao.id);
       applyTranscriptionUpdate(data);
     } catch (error) {
-      toast({ title: 'Erro ao parar transcricao', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao parar transcrição', description: error.message, variant: 'destructive' });
     }
   };
 
@@ -576,7 +576,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
         applyTranscriptionUpdate(data);
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
-          console.error('Erro ao atualizar transcricao', error);
+          console.error('Erro ao atualizar transcrição', error);
         }
       }
     };
@@ -677,7 +677,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 
         <div className="flex flex-col">
 
-          <span className="font-bold text-lg text-foreground truncate">{gravacao.radios?.nome || 'RaRadio Desconhecida'}</span>
+          <span className="font-bold text-lg text-foreground truncate">{gravacao.radios?.nome || 'Rádio desconhecida'}</span>
 
           <span className="text-sm text-muted-foreground">
 
@@ -712,7 +712,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
             className="h-9 w-9"
             onClick={handleToggleTranscription}
             disabled={!gravacao.arquivo_url && !isTranscriptionOpen}
-            title={isTranscriptionOpen ? 'Recolher transcricao' : 'Abrir transcricao'}
+            title={isTranscriptionOpen ? 'Recolher transcrição' : 'Abrir transcrição'}
           >
             {isTranscriptionOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
           </Button>
@@ -721,7 +721,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
           </Button>
 
 
-          <AlertDialog><AlertDialogTrigger asChild><Button size="icon" variant="ghost" className="h-9 w-9 text-destructive hover:text-destructive-foreground hover:bg-destructive/90"><Trash2 className="w-5 h-5" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Você tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. Isso excluira permanentemente a gravação e todos os dados associados.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={isDeleting}>{isDeleting ? 'Excluindo...' : 'Sim, Excluir'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+          <AlertDialog><AlertDialogTrigger asChild><Button size="icon" variant="ghost" className="h-9 w-9 text-destructive hover:text-destructive-foreground hover:bg-destructive/90"><Trash2 className="w-5 h-5" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Você tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. Isso excluirá permanentemente a gravação e todos os dados associados.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={isDeleting}>{isDeleting ? 'Excluindo...' : 'Sim, Excluir'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 
         </div>
 
@@ -774,7 +774,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
             </Button>
             </div>
             <div className="text-xs text-muted-foreground lg:ml-auto">
-              Progresso: {progressValue}% | Tempo percorrido: {elapsedLabel} | Ultima atualizacao: {idleLabel}
+              Progresso: {progressValue}% | Tempo percorrido: {elapsedLabel} | Última atualização: {idleLabel}
             </div>
           </div>
           <div className="mt-3 h-2 w-full rounded-full bg-slate-800/80 overflow-hidden">
@@ -794,14 +794,14 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
                 Carregando transcrição...
               </div>
             ) : transcriptionData.status === 'fila' ? (
-              <div className="text-muted-foreground">Transcricao na fila. Tempo na fila: {elapsedLabel}. Ultima atualizacao: {idleLabel}.</div>
+              <div className="text-muted-foreground">Transcrição na fila. Tempo na fila: {elapsedLabel}. Última atualização: {idleLabel}.</div>
             ) : transcriptionData.status === 'processando' ? (
               isStalled ? (
-                <div className="text-amber-300">Sem atualizacao ha {idleLabel}. Voce pode reprocessar.</div>
+                <div className="text-amber-300">Sem atualização há {idleLabel}. Você pode reprocessar.</div>
               ) : (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Loader className="w-4 h-4 animate-spin" />
-                  Transcricao em processamento... Ultima atualizacao: {idleLabel}
+                  Transcrição em processamento... Última atualização: {idleLabel}
                 </div>
               )
             ) : transcriptionData.status === 'interrompido' ? (
@@ -900,7 +900,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
     } catch (error) {
 
-      toast({ title: 'Erro ao buscar raRadios', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao buscar rádios', description: error.message, variant: 'destructive' });
 
     }
 
@@ -1004,11 +1004,11 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
     if (!gravacao?.id) return;
     const idStr = String(gravacao.id);
     if (idStr.startsWith('ag-')) {
-      toast({ title: 'Nao e possivel parar', description: 'Agendamentos nao podem ser parados manualmente.', variant: 'destructive' });
+      toast({ title: 'Não é possível parar', description: 'Agendamentos não podem ser parados manualmente.', variant: 'destructive' });
       return;
     }
     if (!['gravando', 'iniciando', 'processando'].includes(gravacao.status)) {
-      toast({ title: 'Gravacao nao esta em andamento', description: 'Apenas gravações ativas podem ser paradas.', variant: 'destructive' });
+      toast({ title: 'Gravação não está em andamento', description: 'Apenas gravações ativas podem ser paradas.', variant: 'destructive' });
       return;
     }
     setStoppingId(gravacao.id);
@@ -1034,7 +1034,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
       case 'processando':
         return { label: 'Processando', className: 'bg-indigo-500/15 border-indigo-500/40 text-indigo-200 animate-pulse' };
       case 'concluido':
-        return { label: 'Concluida', className: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200' };
+        return { label: 'Concluída', className: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200' };
       default:
         return { label: gravacao.status || 'Desconhecido', className: 'bg-slate-700/40 border-slate-600 text-slate-200' };
     }
@@ -1348,7 +1348,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
                     >
                       <div className="flex items-center gap-3">
                         <div className="flex flex-col">
-                          <span className="text-white font-semibold">{gravacao.radios?.nome || 'Radio'}</span>
+                          <span className="text-white font-semibold">{gravacao.radios?.nome || 'Rádio'}</span>
                           <div className="flex items-center gap-2 text-xs text-slate-400">
                             <span>Iniciada em {format(new Date(gravacao.criado_em), "d MMM 'às' HH:mm", { locale: ptBR })}</span>
                             <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-200 uppercase tracking-wide">
@@ -1458,9 +1458,9 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
                 <XCircle className="w-16 h-16 text-slate-600 mx-auto mb-4" />
 
-                <h3 className="text-2xl font-bold text-white mb-2">Nenhuma gravacao manual encontrada</h3>
+                <h3 className="text-2xl font-bold text-white mb-2">Nenhuma gravação manual encontrada</h3>
 
-                <p className="text-muted-foreground">Ajuste os filtros ou realize novas gravacoes.</p>
+                <p className="text-muted-foreground">Ajuste os filtros ou realize novas gravações.</p>
 
               </div>
 
