@@ -9,7 +9,7 @@ import { Helmet } from 'react-helmet';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useLocation } from 'react-router-dom';
-import { Play, Pause, Download, Trash2, Clock, FileArchive, FileText, Mic, Filter, ListFilter, CalendarDays, MapPin, XCircle, Loader, Square, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Pause, Download, Trash2, Clock, FileArchive, FileText, Mic, Filter, ListFilter, CalendarDays, MapPin, XCircle, Loader, Square, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -262,6 +262,10 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
     erro: gravacao?.transcricao_erro || null,
     progresso: gravacao?.transcricao_progresso ?? 0,
   });
+  const [transcriptionStartedAt, setTranscriptionStartedAt] = useState(null);
+  const [transcriptionFinishedAt, setTranscriptionFinishedAt] = useState(null);
+  const [transcriptionLastUpdateAt, setTranscriptionLastUpdateAt] = useState(null);
+  const [transcriptionNow, setTranscriptionNow] = useState(Date.now());
 
   useEffect(() => {
     setTranscriptionData((prev) => ({
@@ -359,7 +363,37 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 
   };
 
+  const markTranscriptionStart = () => {
+    const now = Date.now();
+    setTranscriptionStartedAt(now);
+    setTranscriptionFinishedAt(null);
+    setTranscriptionLastUpdateAt(now);
+    setTranscriptionNow(now);
+  };
+
+  const applyTranscriptionUpdate = (data) => {
+    setTranscriptionData((prev) => {
+      const next = {
+        ...prev,
+        status: data?.status ?? prev.status ?? null,
+        texto: data?.texto ?? prev.texto ?? '',
+        erro: data?.erro ?? prev.erro ?? null,
+        progresso: data?.progresso ?? prev.progresso ?? 0,
+      };
+      const changed = next.status !== prev.status || next.texto !== prev.texto || next.erro !== prev.erro || next.progresso !== prev.progresso;
+      if (changed) {
+        setTranscriptionLastUpdateAt(Date.now());
+      }
+      return next;
+    });
+  };
+
   const handleToggleTranscription = async () => {
+    if (isTranscriptionOpen) {
+      setIsTranscriptionOpen(false);
+      setIsTranscriptionLoading(false);
+      return;
+    }
 
     if (!gravacao?.arquivo_url) {
       toast({ title: 'Transcrição indisponível', description: 'O arquivo desta gravação não foi encontrado.', variant: 'destructive' });
@@ -372,24 +406,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
     setIsTranscriptionLoading(true);
     try {
       const data = await apiClient.getTranscricao(gravacao.id);
-      setTranscriptionData({
-        status: data?.status || null,
-        texto: data?.texto || '',
-        erro: data?.erro || null,
-        progresso: data?.progresso ?? 0,
-      });
-
-      const shouldStart = gravacao.status === 'concluido' && !data?.texto;
-      const stuckAtZero = ['processando', 'fila'].includes(data?.status) && (data?.progresso ?? 0) <= 0;
-      const forceStart = ['erro', 'interrompido'].includes(data?.status) || stuckAtZero;
-      if (shouldStart) {
-        const started = await apiClient.startTranscricao(gravacao.id, { force: forceStart });
-        setTranscriptionData((prev) => ({
-          ...prev,
-          status: started?.status || (forceStart ? 'processando' : prev.status) || 'processando',
-          progresso: prev.progresso ?? 0,
-        }));
-      }
+      applyTranscriptionUpdate(data);
     } catch (error) {
       toast({ title: 'Erro ao carregar transcrição', description: error.message, variant: 'destructive' });
     } finally {
@@ -411,12 +428,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
     setIsTranscriptionLoading(true);
     try {
       const data = await apiClient.getTranscricao(gravacao.id);
-      setTranscriptionData({
-        status: data?.status || null,
-        texto: data?.texto || '',
-        erro: data?.erro || null,
-        progresso: data?.progresso ?? 0,
-      });
+      applyTranscriptionUpdate(data);
 
       if (gravacao.status !== 'concluido') {
         toast({ title: 'Transcrição indisponível', description: 'A transcrição fica disponível após a gravação concluir.' });
@@ -432,6 +444,8 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
         toast({ title: 'Transcrição já concluída', description: 'Use Reprocessar se quiser gerar novamente.' });
         return;
       }
+
+      markTranscriptionStart();
 
       const started = await apiClient.startTranscricao(gravacao.id, { force: false });
       setTranscriptionData((prev) => ({
@@ -461,6 +475,8 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
         toast({ title: 'Transcrição indisponível', description: 'A transcrição fica disponível após a gravação concluir.' });
         return;
       }
+
+      markTranscriptionStart();
 
       const started = await apiClient.startTranscricao(gravacao.id, { force: true });
       setTranscriptionData((prev) => ({
@@ -522,20 +538,31 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
   };
   const handleStopTranscription = async () => {
     if (!gravacao?.id) return;
-    setTranscriptionData((prev) => ({
-      ...prev,
-      status: 'interrompendo',
-    }));
+    applyTranscriptionUpdate({ status: 'interrompendo' });
     try {
       const data = await apiClient.stopTranscricao(gravacao.id);
-      setTranscriptionData((prev) => ({
-        ...prev,
-        status: data?.status || 'interrompendo',
-      }));
+      applyTranscriptionUpdate(data);
     } catch (error) {
       toast({ title: 'Erro ao parar transcricao', description: error.message, variant: 'destructive' });
     }
   };
+
+  useEffect(() => {
+    if (!transcriptionStartedAt && !transcriptionLastUpdateAt) return;
+    if (transcriptionFinishedAt) {
+      setTranscriptionNow(transcriptionFinishedAt);
+      return;
+    }
+    const timer = setInterval(() => setTranscriptionNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [transcriptionStartedAt, transcriptionLastUpdateAt, transcriptionFinishedAt]);
+
+  useEffect(() => {
+    if (!transcriptionStartedAt || transcriptionFinishedAt) return;
+    if (['concluido', 'erro', 'interrompido'].includes(transcriptionData.status)) {
+      setTranscriptionFinishedAt(Date.now());
+    }
+  }, [transcriptionData.status, transcriptionStartedAt, transcriptionFinishedAt]);
 
   useEffect(() => {
     if (!isTranscriptionOpen) return;
@@ -546,13 +573,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
       try {
         const data = await apiClient.getTranscricao(gravacao.id);
         if (!active) return;
-        setTranscriptionData((prev) => ({
-          ...prev,
-          status: data?.status || prev.status,
-          texto: data?.texto || prev.texto,
-          erro: data?.erro || prev.erro,
-          progresso: data?.progresso ?? prev.progresso ?? 0,
-        }));
+        applyTranscriptionUpdate(data);
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
           console.error('Erro ao atualizar transcricao', error);
@@ -632,10 +653,18 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
   };
 
   const progressValue = Math.min(100, Math.max(0, Number(transcriptionData.progresso || 0)));
-  const elapsedSeconds = gravacao?.duracao_segundos
-    ? Math.round((gravacao.duracao_segundos * progressValue) / 100)
+  const timerNow = transcriptionFinishedAt || transcriptionNow;
+  const elapsedSeconds = transcriptionStartedAt
+    ? Math.max(0, Math.floor((timerNow - transcriptionStartedAt) / 1000))
     : null;
-
+  const idleSeconds = transcriptionLastUpdateAt
+    ? Math.max(0, Math.floor((timerNow - transcriptionLastUpdateAt) / 1000))
+    : null;
+  const elapsedLabel = elapsedSeconds !== null ? formatDuration(elapsedSeconds) : '--:--';
+  const idleLabel = idleSeconds !== null ? formatDuration(idleSeconds) : '--:--';
+  const isStalled = idleSeconds !== null
+    && idleSeconds >= 90
+    && ['processando', 'fila'].includes(transcriptionData.status);
   return (
 
     <motion.div layout="position" initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -50, scale: 0.9 }} transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', stiffness: 120 }} className={`card-item flex flex-col p-4 gap-4 transition-colors duration-200 ${isSelected ? 'bg-primary/10 border-primary' : 'border-transparent'}`}>
@@ -678,6 +707,15 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
           <Button size="sm" variant="outline" onClick={handleStartTranscription} disabled={!gravacao.arquivo_url}>
             <FileText className="w-4 h-4 mr-2" />
             Transcrever
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={handleToggleTranscription}
+            disabled={!gravacao.arquivo_url && !isTranscriptionOpen}
+            title={isTranscriptionOpen ? 'Recolher transcricao' : 'Abrir transcricao'}
+          >
+            {isTranscriptionOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
           </Button>
 
 
@@ -734,7 +772,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
             </Button>
             </div>
             <div className="text-xs text-muted-foreground lg:ml-auto">
-              Progresso: {progressValue}% | Tempo percorrido: {elapsedSeconds !== null ? formatDuration(elapsedSeconds) : '--:--'}
+              Progresso: {progressValue}% | Tempo percorrido: {elapsedLabel} | Ultima atualizacao: {idleLabel}
             </div>
           </div>
           <div className="mt-3 h-2 w-full rounded-full bg-slate-800/80 overflow-hidden">
@@ -754,12 +792,16 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
                 Carregando transcrição...
               </div>
             ) : transcriptionData.status === 'fila' ? (
-              <div className="text-muted-foreground">Transcrição na fila. Aguarde...</div>
+              <div className="text-muted-foreground">Transcricao na fila. Tempo na fila: {elapsedLabel}. Ultima atualizacao: {idleLabel}.</div>
             ) : transcriptionData.status === 'processando' ? (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader className="w-4 h-4 animate-spin" />
-                Transcrição em processamento...
-              </div>
+              isStalled ? (
+                <div className="text-amber-300">Sem atualizacao ha {idleLabel}. Voce pode reprocessar.</div>
+              ) : (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader className="w-4 h-4 animate-spin" />
+                  Transcricao em processamento... Ultima atualizacao: {idleLabel}
+                </div>
+              )
             ) : transcriptionData.status === 'interrompido' ? (
               <div className="text-muted-foreground">Transcrição interrompida.</div>
             ) : transcriptionData.status === 'erro' ? (

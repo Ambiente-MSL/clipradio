@@ -26,7 +26,7 @@ def _get_audio_filepath(gravacao):
 
 
 def _resolve_audio_filepath(gravacao):
-    filepath = _resolve_audio_filepath(gravacao)
+    filepath = _get_audio_filepath(gravacao)
     if filepath and os.path.exists(filepath):
         return filepath
     if not gravacao or not gravacao.id:
@@ -159,7 +159,7 @@ def transcribe_gravacao(gravacao_id, *, force=False):
     if gravacao.transcricao_status == "processando" and not force:
         return True
 
-    filepath = _get_audio_filepath(gravacao)
+    filepath = _resolve_audio_filepath(gravacao)
     if not filepath or not os.path.exists(filepath):
         _commit_transcription(
             gravacao,
@@ -234,6 +234,13 @@ def transcribe_gravacao(gravacao_id, *, force=False):
                     cancelada=True,
                 )
                 return False
+            if gravacao.transcricao_status == "fila":
+                _commit_transcription(
+                    gravacao,
+                    status="processando",
+                    progresso=max(1, gravacao.transcricao_progresso or 0),
+                    cancelada=False,
+                )
         except Exception:
             pass
 
