@@ -703,10 +703,8 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
 
           <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${statusColors[gravacao.status] || statusColors.agendado}`}>{statusText[gravacao.status] || 'Desconhecido'}</span>
 
-          <Button size="icon" variant="ghost" className="h-9 w-9" onClick={handleDownload} disabled={!gravacao.arquivo_url}><Download className="w-5 h-5" /></Button>
-          <Button size="sm" variant="outline" onClick={handleStartTranscription} disabled={!gravacao.arquivo_url}>
-            <FileText className="w-4 h-4 mr-2" />
-            Transcrever
+          <Button size="icon" variant="ghost" className="h-9 w-9" onClick={handleStartTranscription} disabled={!gravacao.arquivo_url} title="Transcrever">
+            <FileText className="w-5 h-5" />
           </Button>
           <Button
             size="icon"
@@ -717,6 +715,9 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
             title={isTranscriptionOpen ? 'Recolher transcricao' : 'Abrir transcricao'}
           >
             {isTranscriptionOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </Button>
+          <Button size="icon" variant="ghost" className="h-9 w-9" onClick={handleDownload} disabled={!gravacao.arquivo_url} title="Baixar">
+            <Download className="w-5 h-5" />
           </Button>
 
 
