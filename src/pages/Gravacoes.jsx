@@ -10,7 +10,7 @@ import { Helmet } from 'react-helmet';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useLocation } from 'react-router-dom';
-import { Play, Pause, Download, Trash2, Clock, FileArchive, FileText, Mic, Filter, ListFilter, CalendarDays, MapPin, XCircle, Loader, Square, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Copy } from 'lucide-react';
+import { Play, Pause, Download, Trash2, Clock, FileArchive, FileText, Mic, Filter, ListFilter, CalendarDays, MapPin, XCircle, Loader, Square, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Copy, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -74,7 +74,19 @@ const buildTranscriptionDownloadName = (gravacao, audioUrl) => {
   return `${baseName}.txt`;
 };
 
+const buildTranscriptionReportName = (gravacao, audioUrl) => {
+  const audioName = buildDownloadName(gravacao, audioUrl);
+  const baseName = audioName.replace(/\.[^.]+$/, '');
+  return `${baseName}_relatorio.html`;
+};
+
 const escapeRegExp = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeHtml = (value) => String(value || '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
 
 
 const StatCard = ({ icon, value, unit, delay, gradient }) => (
@@ -284,6 +296,7 @@ const GravacaoItem = ({
   const [activeTagId, setActiveTagId] = useState(null);
   const [transcriptionSegments, setTranscriptionSegments] = useState(null);
   const [isTranscriptionSegmentsLoading, setIsTranscriptionSegmentsLoading] = useState(false);
+  const [isReportGenerating, setIsReportGenerating] = useState(false);
   const [tooltipState, setTooltipState] = useState({ visible: false, text: '', x: 0, y: 0 });
   const tooltipRafRef = useRef(null);
 
@@ -585,6 +598,231 @@ const GravacaoItem = ({
     }
   };
 
+  const handleDownloadReport = async () => {
+    if (transcriptionData.status !== 'concluido') {
+      toast({ title: 'Relatório indisponível', description: 'A transcrição precisa estar concluída.' });
+      return;
+    }
+    if (!transcriptionData.texto) {
+      toast({ title: 'Transcrição vazia', description: 'Nenhum texto para gerar relatório.' });
+      return;
+    }
+    if (!gravacao?.id) return;
+    setIsReportGenerating(true);
+    try {
+      let segments = transcriptionSegments;
+      if (!Array.isArray(segments) || segments.length === 0) {
+        segments = await fetchTranscriptionSegments();
+      }
+      const tagsForReport = matchedTags;
+      const occurrences = [];
+      if (Array.isArray(tagsForReport) && tagsForReport.length > 0) {
+        const regexList = tagsForReport.map((tag) => ({
+          tag,
+          regex: new RegExp(`\\b${escapeRegExp(String(tag?.nome || '').trim())}\\b`, 'gi'),
+        }));
+        const countMap = new Map();
+        regexList.forEach(({ tag }) => {
+          countMap.set(tag.id, { tag, count: 0, times: new Set() });
+        });
+        if (Array.isArray(segments) && segments.length > 0) {
+          segments.forEach((segment) => {
+            const segmentText = String(segment?.text || '');
+            if (!segmentText) return;
+            const startSeconds = Math.max(0, Math.floor(Number(segment?.start || 0)));
+            const endSeconds = Math.max(0, Math.floor(Number(segment?.end || 0)));
+            const startLabel = formatDuration(startSeconds);
+            const endLabel = formatDuration(endSeconds);
+            const timeLabel = startLabel === endLabel ? startLabel : `${startLabel}–${endLabel}`;
+            regexList.forEach(({ tag, regex }) => {
+              regex.lastIndex = 0;
+              let match;
+              while ((match = regex.exec(segmentText)) !== null) {
+                const entry = countMap.get(tag.id);
+                if (!entry) return;
+                entry.count += 1;
+                entry.times.add(timeLabel);
+              }
+            });
+          });
+        } else {
+          regexList.forEach(({ tag, regex }) => {
+            regex.lastIndex = 0;
+            let match;
+            let count = 0;
+            while ((match = regex.exec(transcriptionData.texto)) !== null) {
+              count += 1;
+            }
+            const entry = countMap.get(tag.id);
+            if (entry) {
+              entry.count = count;
+            }
+          });
+        }
+        countMap.forEach((value) => {
+          occurrences.push({
+            tag: value.tag,
+            count: value.count,
+            times: Array.from(value.times),
+          });
+        });
+      }
+
+      const audioUrl = resolveFileUrl(gravacao.arquivo_url, gravacao.arquivo_nome);
+      const filename = buildTranscriptionReportName(gravacao, audioUrl);
+      const reportHtml = buildTranscriptionReportHtml(
+        transcriptionData.texto,
+        tagsForReport,
+        occurrences,
+        {
+          radio: gravacao.radios?.nome || 'Rádio',
+          createdAt: gravacao.criado_em
+            ? format(new Date(gravacao.criado_em), "d MMM, yyyy 'às' HH:mm", { locale: ptBR })
+            : '',
+          duration: formatDuration(gravacao.duracao_segundos || 0),
+        }
+      );
+      const blob = new Blob([reportHtml], { type: 'text/html;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast({ title: 'Relatório gerado', description: 'O relatório foi baixado com sucesso.' });
+    } catch (error) {
+      toast({ title: 'Erro ao gerar relatório', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsReportGenerating(false);
+    }
+  };
+
+  const buildTranscriptionReportHtml = (text, tags, occurrences, meta) => {
+    const safeText = String(text || '');
+    const tagList = Array.isArray(tags) ? tags : [];
+    const occurrenceList = Array.isArray(occurrences) ? occurrences : [];
+    const tagLookup = new Map(
+      tagList.map((tag) => [String(tag?.nome || '').trim().toLowerCase(), tag])
+    );
+    const tagPattern = tagList
+      .map((tag) => String(tag?.nome || '').trim())
+      .filter(Boolean)
+      .map(escapeRegExp)
+      .join('|');
+    const regex = tagPattern ? new RegExp(`\\b(${tagPattern})\\b`, 'gi') : null;
+    const highlightedParts = [];
+    let lastIndex = 0;
+    if (regex) {
+      let match;
+      while ((match = regex.exec(safeText)) !== null) {
+        const start = match.index;
+        const end = start + match[0].length;
+        if (start > lastIndex) {
+          highlightedParts.push(escapeHtml(safeText.slice(lastIndex, start)));
+        }
+        const rawMatch = match[0];
+        const lookupKey = rawMatch.trim().toLowerCase();
+        const tag = tagLookup.get(lookupKey);
+        const tagColor = tag?.cor ? String(tag.cor).trim() : '';
+        const useCustomColor = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(tagColor);
+        const highlightStyle = useCustomColor
+          ? `background-color: ${tagColor}33; border-color: ${tagColor};`
+          : 'background-color: #34d39933; border-color: #34d399;';
+        highlightedParts.push(
+          `<span class="tag-highlight" style="${highlightStyle}">${escapeHtml(rawMatch)}</span>`
+        );
+        lastIndex = end;
+      }
+    }
+    if (!highlightedParts.length) {
+      highlightedParts.push(escapeHtml(safeText));
+    } else if (lastIndex < safeText.length) {
+      highlightedParts.push(escapeHtml(safeText.slice(lastIndex)));
+    }
+    const highlightedHtml = highlightedParts.join('');
+
+    const tableRows = occurrenceList.length
+      ? occurrenceList.map((item) => {
+        const tag = item.tag || {};
+        const tagColor = tag?.cor ? String(tag.cor).trim() : '';
+        const useCustomColor = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(tagColor);
+        const swatchStyle = useCustomColor ? `background-color: ${tagColor};` : 'background-color: #34d399;';
+        const times = (item.times || []).join(', ') || 'Minutagem indisponível';
+        return `
+          <tr>
+            <td>
+              <span class="swatch" style="${swatchStyle}"></span>
+              ${escapeHtml(tag?.nome || '')}
+            </td>
+            <td>${item.count || 0}</td>
+            <td>${escapeHtml(times)}</td>
+          </tr>
+        `;
+      }).join('')
+      : `
+        <tr>
+          <td colspan="3">Nenhuma tag encontrada.</td>
+        </tr>
+      `;
+
+    const headerInfo = [
+      meta?.radio ? `Rádio: ${meta.radio}` : '',
+      meta?.createdAt ? `Data: ${meta.createdAt}` : '',
+      meta?.duration ? `Duração: ${meta.duration}` : '',
+    ].filter(Boolean).join(' | ');
+
+    return `
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Relatório de transcrição</title>
+  <style>
+    body { margin: 0; padding: 32px; font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; background: #f8fafc; }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    .meta { margin-bottom: 24px; color: #475569; font-size: 13px; }
+    .section { margin-bottom: 24px; }
+    .card { background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 16px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08); }
+    .tags-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .tags-table th { text-align: left; padding: 10px 8px; background: #f1f5f9; color: #334155; font-weight: 600; }
+    .tags-table td { padding: 10px 8px; border-top: 1px solid #e2e8f0; vertical-align: top; }
+    .tags-table tr:nth-child(even) td { background: #f8fafc; }
+    .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 999px; margin-right: 6px; vertical-align: middle; }
+    .transcription { white-space: pre-wrap; line-height: 1.6; font-size: 14px; }
+    .tag-highlight { border: 1px solid #34d399; border-radius: 6px; padding: 2px 4px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Relatório de transcrição</h1>
+  <div class="meta">${escapeHtml(headerInfo)}</div>
+
+  <div class="section card">
+    <h2>Resumo de tags</h2>
+    <table class="tags-table">
+      <thead>
+        <tr>
+          <th>Tag</th>
+          <th>Ocorrências</th>
+          <th>Minutagem</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${tableRows}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section card">
+    <h2>Transcrição completa</h2>
+    <div class="transcription">${highlightedHtml}</div>
+  </div>
+</body>
+</html>
+`;
+  };
+
   const fetchTranscriptionSegments = useCallback(async () => {
     if (!gravacao?.id) return;
     setIsTranscriptionSegmentsLoading(true);
@@ -592,8 +830,10 @@ const GravacaoItem = ({
       const data = await apiClient.getTranscricaoSegmentos(gravacao.id);
       const segments = Array.isArray(data?.segments) ? data.segments : [];
       setTranscriptionSegments(segments);
+      return segments;
     } catch (error) {
       toast({ title: 'Erro ao carregar minutagem', description: error.message, variant: 'destructive' });
+      return null;
     } finally {
       setIsTranscriptionSegmentsLoading(false);
     }
@@ -1017,6 +1257,24 @@ const GravacaoItem = ({
               aria-label="Baixar texto"
             >
               <Download className="w-4 h-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleDownloadReport}
+              disabled={!transcriptionData.texto || transcriptionData.status !== 'concluido' || isReportGenerating}
+            >
+              {isReportGenerating ? (
+                <>
+                  <Loader className="w-4 h-4 mr-2 animate-spin" />
+                  Gerando...
+                </>
+              ) : (
+                <>
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Relatório
+                </>
+              )}
             </Button>
             <Button
               size="icon"
