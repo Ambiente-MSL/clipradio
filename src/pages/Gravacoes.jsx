@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 import { motion } from 'framer-motion';
 
@@ -282,6 +283,8 @@ const GravacaoItem = ({
   const [activeTagId, setActiveTagId] = useState(null);
   const [transcriptionSegments, setTranscriptionSegments] = useState(null);
   const [isTranscriptionSegmentsLoading, setIsTranscriptionSegmentsLoading] = useState(false);
+  const [tooltipState, setTooltipState] = useState({ visible: false, text: '', x: 0, y: 0 });
+  const tooltipRafRef = useRef(null);
 
   useEffect(() => {
     setTranscriptionData((prev) => ({
@@ -593,6 +596,38 @@ const GravacaoItem = ({
     }
   };
 
+  const updateTooltipPosition = useCallback((clientX, clientY, text) => {
+    const padding = 24;
+    const offsetY = 16;
+    const maxX = window.innerWidth - padding;
+    const maxY = window.innerHeight - padding;
+    const x = Math.min(maxX, Math.max(padding, clientX));
+    const y = Math.min(maxY, Math.max(padding, clientY - offsetY));
+    setTooltipState({ visible: true, text, x, y });
+  }, []);
+
+  const handleHighlightEnter = useCallback((event, text) => {
+    const { clientX, clientY } = event;
+    updateTooltipPosition(clientX, clientY, text);
+  }, [updateTooltipPosition]);
+
+  const handleHighlightMove = useCallback((event, text) => {
+    const { clientX, clientY } = event;
+    if (tooltipRafRef.current) return;
+    tooltipRafRef.current = window.requestAnimationFrame(() => {
+      tooltipRafRef.current = null;
+      updateTooltipPosition(clientX, clientY, text);
+    });
+  }, [updateTooltipPosition]);
+
+  const handleHighlightLeave = useCallback(() => {
+    if (tooltipRafRef.current) {
+      window.cancelAnimationFrame(tooltipRafRef.current);
+      tooltipRafRef.current = null;
+    }
+    setTooltipState((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+  }, []);
+
   useEffect(() => {
     if (!transcriptionStartedAt && !transcriptionLastUpdateAt) return;
     if (transcriptionFinishedAt) {
@@ -648,6 +683,15 @@ const GravacaoItem = ({
     isTranscriptionSegmentsLoading,
     fetchTranscriptionSegments,
   ]);
+
+  useEffect(() => {
+    return () => {
+      if (tooltipRafRef.current) {
+        window.cancelAnimationFrame(tooltipRafRef.current);
+        tooltipRafRef.current = null;
+      }
+    };
+  }, []);
 
 
 
@@ -747,13 +791,17 @@ const GravacaoItem = ({
     const highlightStyle = useCustomColor
       ? { backgroundColor: `${tagColor}33`, borderColor: tagColor }
       : undefined;
-    const highlightClass = "relative inline-block rounded px-1 py-0.5 font-semibold border border-emerald-400/40 bg-emerald-400/20 text-emerald-200 cursor-help";
+    const highlightClass = "inline-block rounded px-1 py-0.5 font-semibold border border-emerald-400/40 bg-emerald-400/20 text-emerald-200 cursor-help";
     const renderHighlight = (key, value, tooltipText) => (
-      <span key={key} className={`${highlightClass} group`} style={highlightStyle}>
+      <span
+        key={key}
+        className={highlightClass}
+        style={highlightStyle}
+        onMouseEnter={(event) => handleHighlightEnter(event, tooltipText)}
+        onMouseMove={(event) => handleHighlightMove(event, tooltipText)}
+        onMouseLeave={handleHighlightLeave}
+      >
         {value}
-        <span className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-slate-700 bg-slate-900/95 px-2 py-1 text-[10px] font-semibold text-slate-100 shadow-lg opacity-0 scale-95 transition-all duration-100 group-hover:opacity-100 group-hover:scale-100">
-          {tooltipText}
-        </span>
       </span>
     );
 
@@ -817,8 +865,19 @@ const GravacaoItem = ({
     return nodes;
   }, [transcriptionData.texto, activeTag, transcriptionSegments]);
   return (
+    <>
+      {tooltipState.visible && createPortal(
+        <div
+          className="pointer-events-none fixed z-[9999] rounded-lg border border-slate-700 bg-slate-900/95 px-3 py-1.5 text-xs font-semibold text-slate-100 shadow-xl shadow-black/40"
+          style={{ left: tooltipState.x, top: tooltipState.y, transform: 'translate(-50%, -100%)' }}
+          role="tooltip"
+        >
+          {tooltipState.text}
+        </div>,
+        document.body
+      )}
 
-    <motion.div layout="position" initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -50, scale: 0.9 }} transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', stiffness: 120 }} className={`card-item flex flex-col p-4 gap-4 transition-colors duration-200 ${isSelected ? 'bg-primary/10 border-primary' : 'border-transparent'}`}>
+      <motion.div layout="position" initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -50, scale: 0.9 }} transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', stiffness: 120 }} className={`card-item flex flex-col p-4 gap-4 transition-colors duration-200 ${isSelected ? 'bg-primary/10 border-primary' : 'border-transparent'}`}>
 
       <div className="flex items-center w-full gap-4">
 
@@ -1001,8 +1060,9 @@ const GravacaoItem = ({
         </div>
       )}
 
-    </motion.div>
+      </motion.div>
 
+    </>
   );
 
 };
