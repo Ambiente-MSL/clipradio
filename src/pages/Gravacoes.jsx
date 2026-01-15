@@ -685,6 +685,18 @@ const GravacaoItem = ({
   ]);
 
   useEffect(() => {
+    if (!activeTagId) return;
+    if (!matchedTags.length) {
+      setActiveTagId(null);
+      return;
+    }
+    const stillAvailable = matchedTags.some((tag) => tag.id === activeTagId);
+    if (!stillAvailable) {
+      setActiveTagId(null);
+    }
+  }, [activeTagId, matchedTags]);
+
+  useEffect(() => {
     return () => {
       if (tooltipRafRef.current) {
         window.cancelAnimationFrame(tooltipRafRef.current);
@@ -776,9 +788,22 @@ const GravacaoItem = ({
     || normalizedTranscriptionProgress >= 100
     || transcriptionData.status === 'concluido'
     || gravacao?.transcricao_status === 'concluido';
+  const matchedTags = useMemo(() => {
+    const text = transcriptionData.texto || '';
+    if (!text) return [];
+    return (availableTags || []).filter((tag) => {
+      const label = tag?.nome ? String(tag.nome).trim() : '';
+      if (!label) return false;
+      const escapedLabel = escapeRegExp(label);
+      if (!escapedLabel) return false;
+      const regex = new RegExp(`\\b${escapedLabel}\\b`, 'i');
+      return regex.test(text);
+    });
+  }, [availableTags, transcriptionData.texto]);
+
   const activeTag = useMemo(
-    () => (availableTags || []).find((tag) => tag.id === activeTagId) || null,
-    [availableTags, activeTagId]
+    () => (matchedTags || []).find((tag) => tag.id === activeTagId) || null,
+    [matchedTags, activeTagId]
   );
   const highlightedTranscription = useMemo(() => {
     const text = transcriptionData.texto || '';
@@ -991,9 +1016,9 @@ const GravacaoItem = ({
               Progresso: {progressValue}% | Tempo percorrido: {elapsedLabel} | Última atualização: {idleLabel}
             </div>
           </div>
-          {Array.isArray(availableTags) && availableTags.length > 0 && (
+          {Array.isArray(matchedTags) && matchedTags.length > 0 ? (
             <div className="mt-2 flex flex-wrap gap-2">
-              {availableTags.map((tag) => {
+              {matchedTags.map((tag) => {
                 const isActive = activeTagId === tag.id;
                 const tagColor = tag?.cor ? String(tag.cor).trim() : '';
                 const useCustomColor = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(tagColor);
@@ -1017,6 +1042,8 @@ const GravacaoItem = ({
                 );
               })}
             </div>
+          ) : (
+            <div className="mt-2 text-xs text-slate-400">Nenhuma tag encontrada.</div>
           )}
           <div className="mt-3 h-2 w-full rounded-full bg-slate-800/80 overflow-hidden">
             <div className="h-full bg-emerald-400 transition-all duration-300" style={{ width: `${progressValue}%` }} />
