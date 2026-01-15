@@ -9,7 +9,7 @@ import { Helmet } from 'react-helmet';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useLocation } from 'react-router-dom';
-import { Play, Pause, Download, Trash2, Clock, FileArchive, FileText, Mic, Filter, ListFilter, CalendarDays, MapPin, XCircle, Loader, Square, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { Play, Pause, Download, Trash2, Clock, FileArchive, FileText, Mic, Filter, ListFilter, CalendarDays, MapPin, XCircle, Loader, Square, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -823,20 +823,24 @@ const GravacaoItem = ({
               Parar
             </Button>
             <Button
-              size="sm"
+              size="icon"
               variant="outline"
               onClick={handleDownloadTranscription}
               disabled={!transcriptionData.texto}
+              title="Baixar texto"
+              aria-label="Baixar texto"
             >
-              Baixar texto
+              <Download className="w-4 h-4" />
             </Button>
             <Button
-              size="sm"
+              size="icon"
               variant="outline"
               onClick={handleCopyTranscription}
               disabled={!transcriptionData.texto}
+              title="Copiar transcrição"
+              aria-label="Copiar transcrição"
             >
-              Copiar transcrição
+              <Copy className="w-4 h-4" />
             </Button>
             </div>
             <div className="text-xs text-muted-foreground lg:ml-auto">
