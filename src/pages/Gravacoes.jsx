@@ -665,7 +665,9 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
   const isStalled = idleSeconds !== null
     && idleSeconds >= 90
     && ['processando', 'fila'].includes(transcriptionData.status);
-  const hasTranscription = transcriptionData.status === 'concluido' && Boolean(transcriptionData.texto);
+  const hasTranscription = Boolean(gravacao?.transcricao_disponivel)
+    || transcriptionData.status === 'concluido'
+    || gravacao?.transcricao_status === 'concluido';
   return (
 
     <motion.div layout="position" initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -50, scale: 0.9 }} transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', stiffness: 120 }} className={`card-item flex flex-col p-4 gap-4 transition-colors duration-200 ${isSelected ? 'bg-primary/10 border-primary' : 'border-transparent'}`}>
