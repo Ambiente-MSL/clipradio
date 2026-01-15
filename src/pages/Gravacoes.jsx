@@ -280,6 +280,8 @@ const GravacaoItem = ({
   const [transcriptionLastUpdateAt, setTranscriptionLastUpdateAt] = useState(null);
   const [transcriptionNow, setTranscriptionNow] = useState(Date.now());
   const [activeTagId, setActiveTagId] = useState(null);
+  const [transcriptionSegments, setTranscriptionSegments] = useState(null);
+  const [isTranscriptionSegmentsLoading, setIsTranscriptionSegmentsLoading] = useState(false);
 
   useEffect(() => {
     setTranscriptionData((prev) => ({
@@ -460,6 +462,7 @@ const GravacaoItem = ({
       }
 
       markTranscriptionStart();
+      setTranscriptionSegments(null);
 
       const started = await apiClient.startTranscricao(gravacao.id, { force: false });
       setTranscriptionData((prev) => ({
@@ -491,6 +494,7 @@ const GravacaoItem = ({
       }
 
       markTranscriptionStart();
+      setTranscriptionSegments(null);
 
       const started = await apiClient.startTranscricao(gravacao.id, { force: true });
       setTranscriptionData((prev) => ({
@@ -561,8 +565,32 @@ const GravacaoItem = ({
     }
   };
 
+  const fetchTranscriptionSegments = useCallback(async () => {
+    if (!gravacao?.id) return;
+    setIsTranscriptionSegmentsLoading(true);
+    try {
+      const data = await apiClient.getTranscricaoSegmentos(gravacao.id);
+      const segments = Array.isArray(data?.segments) ? data.segments : [];
+      setTranscriptionSegments(segments);
+    } catch (error) {
+      toast({ title: 'Erro ao carregar minutagem', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsTranscriptionSegmentsLoading(false);
+    }
+  }, [gravacao?.id, toast]);
+
   const handleTagToggle = (tagId) => {
+    const shouldActivate = activeTagId !== tagId;
     setActiveTagId((prev) => (prev === tagId ? null : tagId));
+    if (
+      shouldActivate
+      && !transcriptionSegments
+      && !isTranscriptionSegmentsLoading
+      && transcriptionData.texto
+      && transcriptionData.status === 'concluido'
+    ) {
+      fetchTranscriptionSegments();
+    }
   };
 
   useEffect(() => {
@@ -605,6 +633,21 @@ const GravacaoItem = ({
       clearInterval(timer);
     };
   }, [isTranscriptionOpen, transcriptionData.status, gravacao?.id]);
+
+  useEffect(() => {
+    if (!activeTagId) return;
+    if (!transcriptionData.texto) return;
+    if (transcriptionData.status !== 'concluido') return;
+    if (transcriptionSegments || isTranscriptionSegmentsLoading) return;
+    fetchTranscriptionSegments();
+  }, [
+    activeTagId,
+    transcriptionData.texto,
+    transcriptionData.status,
+    transcriptionSegments,
+    isTranscriptionSegmentsLoading,
+    fetchTranscriptionSegments,
+  ]);
 
 
 
@@ -699,12 +742,59 @@ const GravacaoItem = ({
     if (!text || !label) return text;
     const escapedLabel = escapeRegExp(label);
     if (!escapedLabel) return text;
-    const regex = new RegExp(`\\b${escapedLabel}\\b`, 'gi');
     const tagColor = activeTag?.cor ? String(activeTag.cor).trim() : '';
     const useCustomColor = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(tagColor);
     const highlightStyle = useCustomColor
       ? { backgroundColor: `${tagColor}33`, borderColor: tagColor }
       : undefined;
+    const highlightClass = "rounded px-1 py-0.5 font-semibold border border-emerald-400/40 bg-emerald-400/20 text-emerald-200";
+
+    if (Array.isArray(transcriptionSegments) && transcriptionSegments.length > 0) {
+      const nodes = [];
+      transcriptionSegments.forEach((segment, segmentIndex) => {
+        const segmentText = String(segment?.text || '').trim();
+        if (!segmentText) return;
+        const startSeconds = Math.max(0, Math.floor(Number(segment?.start || 0)));
+        const endSeconds = Math.max(0, Math.floor(Number(segment?.end || 0)));
+        const startLabel = formatDuration(startSeconds);
+        const endLabel = formatDuration(endSeconds);
+        const tooltip = startLabel === endLabel
+          ? `Encontrada em ${startLabel}`
+          : `Encontrada entre ${startLabel} e ${endLabel}`;
+        const regex = new RegExp(`\\b${escapedLabel}\\b`, 'gi');
+        const segmentNodes = [];
+        let lastIndex = 0;
+        let match;
+        while ((match = regex.exec(segmentText)) !== null) {
+          const start = match.index;
+          const end = start + match[0].length;
+          if (start > lastIndex) {
+            segmentNodes.push(segmentText.slice(lastIndex, start));
+          }
+          segmentNodes.push(
+            <span
+              key={`tag-${segmentIndex}-${start}-${end}`}
+              className={highlightClass}
+              style={highlightStyle}
+              title={tooltip}
+            >
+              {match[0]}
+            </span>
+          );
+          lastIndex = end;
+        }
+        if (!segmentNodes.length) {
+          segmentNodes.push(segmentText);
+        } else if (lastIndex < segmentText.length) {
+          segmentNodes.push(segmentText.slice(lastIndex));
+        }
+        if (nodes.length) nodes.push(' ');
+        nodes.push(...segmentNodes);
+      });
+      return nodes.length ? nodes : text;
+    }
+
+    const regex = new RegExp(`\\b${escapedLabel}\\b`, 'gi');
     const nodes = [];
     let lastIndex = 0;
     let match;
@@ -717,8 +807,9 @@ const GravacaoItem = ({
       nodes.push(
         <span
           key={`tag-${start}-${end}`}
-          className="rounded px-1 py-0.5 font-semibold border border-emerald-400/40 bg-emerald-400/20 text-emerald-200"
+          className={highlightClass}
           style={highlightStyle}
+          title="Minutagem indisponível"
         >
           {match[0]}
         </span>
@@ -730,7 +821,7 @@ const GravacaoItem = ({
       nodes.push(text.slice(lastIndex));
     }
     return nodes;
-  }, [transcriptionData.texto, activeTag]);
+  }, [transcriptionData.texto, activeTag, transcriptionSegments]);
   return (
 
     <motion.div layout="position" initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -50, scale: 0.9 }} transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', stiffness: 120 }} className={`card-item flex flex-col p-4 gap-4 transition-colors duration-200 ${isSelected ? 'bg-primary/10 border-primary' : 'border-transparent'}`}>

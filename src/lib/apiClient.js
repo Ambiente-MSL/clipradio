@@ -133,6 +133,10 @@ class ApiClient {
     return this.request(`/gravacoes/${gravacaoId}/transcricao`);
   }
 
+  async getTranscricaoSegmentos(gravacaoId) {
+    return this.request(`/gravacoes/${gravacaoId}/transcricao/segmentos`);
+  }
+
   async startTranscricao(gravacaoId, { force = false } = {}) {
     return this.request(`/gravacoes/${gravacaoId}/transcricao`, {
       method: 'POST',

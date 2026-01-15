@@ -1,3 +1,4 @@
+import json
 import os
 import queue
 import subprocess
@@ -176,6 +177,38 @@ def _probe_duration_seconds(filepath):
         return None
 
 
+def _get_transcription_segments_path(gravacao_id):
+    if not gravacao_id:
+        return None
+    filename = f"{gravacao_id}.segments.json"
+    return os.path.join(Config.STORAGE_PATH, "transcripts", filename)
+
+
+def _persist_transcription_segments(gravacao_id, segments):
+    path = _get_transcription_segments_path(gravacao_id)
+    if not path:
+        return
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fp:
+            json.dump({"segments": segments}, fp, ensure_ascii=True)
+    except Exception:
+        pass
+
+
+def get_transcription_segments(gravacao_id):
+    path = _get_transcription_segments_path(gravacao_id)
+    if not path or not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as fp:
+            data = json.load(fp) or {}
+    except Exception:
+        return []
+    segments = data.get("segments")
+    return segments if isinstance(segments, list) else []
+
+
 def _commit_transcription(
     gravacao,
     *,
@@ -339,6 +372,7 @@ def transcribe_gravacao(gravacao_id, *, force=False):
             total_duration = _probe_duration_seconds(filepath) or 0
 
         parts = []
+        segments_payload = []
         last_progress = gravacao.transcricao_progresso or 0
         last_text_end = 0.0
         text_update_seconds = max(1, int(Config.TRANSCRIBE_TEXT_UPDATE_SECONDS or 10))
@@ -355,6 +389,11 @@ def transcribe_gravacao(gravacao_id, *, force=False):
             text = (segment.text or "").strip()
             if text:
                 parts.append(text)
+                segments_payload.append({
+                    "start": float(getattr(segment, "start", 0) or 0),
+                    "end": float(getattr(segment, "end", 0) or 0),
+                    "text": text,
+                })
 
             segment_end = getattr(segment, "end", 0) or 0
             if total_duration:
@@ -427,6 +466,7 @@ def transcribe_gravacao(gravacao_id, *, force=False):
         progresso=100,
         cancelada=False,
     )
+    _persist_transcription_segments(gravacao.id, segments_payload)
     return True
 
 

@@ -286,6 +286,22 @@ def gravacao_transcricao(gravacao_id):
     }), 200
 
 
+@bp.route('/<gravacao_id>/transcricao/segmentos', methods=['GET'])
+@token_required
+def gravacao_transcricao_segmentos(gravacao_id):
+    ctx = get_user_ctx()
+    is_admin = ctx.get('is_admin', False)
+    gravacao = Gravacao.query.filter_by(id=gravacao_id).first()
+    if not gravacao:
+        return jsonify({'error': 'Gravação não encontrada'}), 404
+    if not is_admin and not _gravacao_access_allowed(gravacao, ctx):
+        return jsonify({'error': 'Gravação não encontrada'}), 404
+
+    from services.transcription_service import get_transcription_segments
+    segments = get_transcription_segments(gravacao.id)
+    return jsonify({'segments': segments}), 200
+
+
 @bp.route('/<gravacao_id>/transcricao/stop', methods=['POST'])
 @token_required
 def gravacao_transcricao_stop(gravacao_id):

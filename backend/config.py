@@ -75,4 +75,5 @@ class Config:
         os.makedirs(Config.UPLOAD_PATH, exist_ok=True)
         os.makedirs(os.path.join(Config.STORAGE_PATH, 'audio'), exist_ok=True)
         os.makedirs(os.path.join(Config.STORAGE_PATH, 'clips'), exist_ok=True)
+        os.makedirs(os.path.join(Config.STORAGE_PATH, 'transcripts'), exist_ok=True)
 
