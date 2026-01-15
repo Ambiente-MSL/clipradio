@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { jsPDF } from 'jspdf';
 
 import { motion } from 'framer-motion';
 
@@ -77,16 +78,27 @@ const buildTranscriptionDownloadName = (gravacao, audioUrl) => {
 const buildTranscriptionReportName = (gravacao, audioUrl) => {
   const audioName = buildDownloadName(gravacao, audioUrl);
   const baseName = audioName.replace(/\.[^.]+$/, '');
-  return `${baseName}_relatorio.html`;
+  return `${baseName}_relatorio.pdf`;
 };
 
 const escapeRegExp = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const escapeHtml = (value) => String(value || '')
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;')
-  .replace(/'/g, '&#39;');
+const hexToRgb = (value) => {
+  const normalized = String(value || '').trim();
+  if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(normalized)) {
+    return null;
+  }
+  let hex = normalized.slice(1);
+  if (hex.length === 3) {
+    hex = hex.split('').map((char) => char + char).join('');
+  }
+  const intVal = parseInt(hex, 16);
+  if (Number.isNaN(intVal)) return null;
+  return {
+    r: (intVal >> 16) & 255,
+    g: (intVal >> 8) & 255,
+    b: intVal & 255,
+  };
+};
 
 
 const StatCard = ({ icon, value, unit, delay, gradient }) => (
@@ -670,7 +682,7 @@ const GravacaoItem = ({
 
       const audioUrl = resolveFileUrl(gravacao.arquivo_url, gravacao.arquivo_nome);
       const filename = buildTranscriptionReportName(gravacao, audioUrl);
-      const reportHtml = buildTranscriptionReportHtml(
+      const reportDoc = buildTranscriptionReportPdf(
         transcriptionData.texto,
         tagsForReport,
         occurrences,
@@ -682,15 +694,7 @@ const GravacaoItem = ({
           duration: formatDuration(gravacao.duracao_segundos || 0),
         }
       );
-      const blob = new Blob([reportHtml], { type: 'text/html;charset=utf-8' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
+      reportDoc.save(filename);
       toast({ title: 'Relatório gerado', description: 'O relatório foi baixado com sucesso.' });
     } catch (error) {
       toast({ title: 'Erro ao gerar relatório', description: error.message, variant: 'destructive' });
@@ -699,7 +703,7 @@ const GravacaoItem = ({
     }
   };
 
-  const buildTranscriptionReportHtml = (text, tags, occurrences, meta) => {
+  const buildTranscriptionReportPdf = (text, tags, occurrences, meta) => {
     const safeText = String(text || '');
     const tagList = Array.isArray(tags) ? tags : [];
     const occurrenceList = Array.isArray(occurrences) ? occurrences : [];
@@ -712,7 +716,7 @@ const GravacaoItem = ({
       .map(escapeRegExp)
       .join('|');
     const regex = tagPattern ? new RegExp(`\\b(${tagPattern})\\b`, 'gi') : null;
-    const highlightedParts = [];
+    const segments = [];
     let lastIndex = 0;
     if (regex) {
       let match;
@@ -720,107 +724,159 @@ const GravacaoItem = ({
         const start = match.index;
         const end = start + match[0].length;
         if (start > lastIndex) {
-          highlightedParts.push(escapeHtml(safeText.slice(lastIndex, start)));
+          segments.push({ text: safeText.slice(lastIndex, start), isTag: false });
         }
         const rawMatch = match[0];
         const lookupKey = rawMatch.trim().toLowerCase();
         const tag = tagLookup.get(lookupKey);
-        const tagColor = tag?.cor ? String(tag.cor).trim() : '';
-        const useCustomColor = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(tagColor);
-        const highlightStyle = useCustomColor
-          ? `background-color: ${tagColor}33; border-color: ${tagColor};`
-          : 'background-color: #34d39933; border-color: #34d399;';
-        highlightedParts.push(
-          `<span class="tag-highlight" style="${highlightStyle}">${escapeHtml(rawMatch)}</span>`
-        );
+        segments.push({
+          text: rawMatch,
+          isTag: true,
+          color: tag?.cor ? String(tag.cor).trim() : null,
+        });
         lastIndex = end;
       }
     }
-    if (!highlightedParts.length) {
-      highlightedParts.push(escapeHtml(safeText));
+    if (!segments.length) {
+      segments.push({ text: safeText, isTag: false });
     } else if (lastIndex < safeText.length) {
-      highlightedParts.push(escapeHtml(safeText.slice(lastIndex)));
+      segments.push({ text: safeText.slice(lastIndex), isTag: false });
     }
-    const highlightedHtml = highlightedParts.join('');
 
-    const tableRows = occurrenceList.length
-      ? occurrenceList.map((item) => {
-        const tag = item.tag || {};
-        const tagColor = tag?.cor ? String(tag.cor).trim() : '';
-        const useCustomColor = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(tagColor);
-        const swatchStyle = useCustomColor ? `background-color: ${tagColor};` : 'background-color: #34d399;';
-        const times = (item.times || []).join(', ') || 'Minutagem indisponível';
-        return `
-          <tr>
-            <td>
-              <span class="swatch" style="${swatchStyle}"></span>
-              ${escapeHtml(tag?.nome || '')}
-            </td>
-            <td>${item.count || 0}</td>
-            <td>${escapeHtml(times)}</td>
-          </tr>
-        `;
-      }).join('')
-      : `
-        <tr>
-          <td colspan="3">Nenhuma tag encontrada.</td>
-        </tr>
-      `;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const maxWidth = pageWidth - margin * 2;
+    const lineHeight = 14;
+    let cursorY = margin;
+
+    const ensureSpace = (height) => {
+      if (cursorY + height > pageHeight - margin) {
+        doc.addPage();
+        cursorY = margin;
+      }
+    };
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Relatório de transcrição', margin, cursorY);
+    cursorY += 22;
 
     const headerInfo = [
       meta?.radio ? `Rádio: ${meta.radio}` : '',
       meta?.createdAt ? `Data: ${meta.createdAt}` : '',
       meta?.duration ? `Duração: ${meta.duration}` : '',
     ].filter(Boolean).join(' | ');
+    if (headerInfo) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(71, 85, 105);
+      const headerLines = doc.splitTextToSize(headerInfo, maxWidth);
+      doc.text(headerLines, margin, cursorY);
+      cursorY += headerLines.length * lineHeight + 6;
+    }
 
-    return `
-<!doctype html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8" />
-  <title>Relatório de transcrição</title>
-  <style>
-    body { margin: 0; padding: 32px; font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; background: #f8fafc; }
-    h1 { margin: 0 0 8px; font-size: 24px; }
-    .meta { margin-bottom: 24px; color: #475569; font-size: 13px; }
-    .section { margin-bottom: 24px; }
-    .card { background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 16px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08); }
-    .tags-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .tags-table th { text-align: left; padding: 10px 8px; background: #f1f5f9; color: #334155; font-weight: 600; }
-    .tags-table td { padding: 10px 8px; border-top: 1px solid #e2e8f0; vertical-align: top; }
-    .tags-table tr:nth-child(even) td { background: #f8fafc; }
-    .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 999px; margin-right: 6px; vertical-align: middle; }
-    .transcription { white-space: pre-wrap; line-height: 1.6; font-size: 14px; }
-    .tag-highlight { border: 1px solid #34d399; border-radius: 6px; padding: 2px 4px; font-weight: 600; }
-  </style>
-</head>
-<body>
-  <h1>Relatório de transcrição</h1>
-  <div class="meta">${escapeHtml(headerInfo)}</div>
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Resumo de tags', margin, cursorY);
+    cursorY += 14;
 
-  <div class="section card">
-    <h2>Resumo de tags</h2>
-    <table class="tags-table">
-      <thead>
-        <tr>
-          <th>Tag</th>
-          <th>Ocorrências</th>
-          <th>Minutagem</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${tableRows}
-      </tbody>
-    </table>
-  </div>
+    const tableWidth = maxWidth;
+    const tagColWidth = Math.min(180, tableWidth * 0.4);
+    const countColWidth = 80;
+    const timeColWidth = tableWidth - tagColWidth - countColWidth;
+    const rowPadding = 6;
 
-  <div class="section card">
-    <h2>Transcrição completa</h2>
-    <div class="transcription">${highlightedHtml}</div>
-  </div>
-</body>
-</html>
-`;
+    ensureSpace(lineHeight + rowPadding * 2);
+    doc.setFillColor(241, 245, 249);
+    doc.rect(margin, cursorY, tableWidth, lineHeight + rowPadding * 2, 'F');
+    doc.setFontSize(10);
+    doc.setTextColor(51, 65, 85);
+    doc.text('Tag', margin + 8, cursorY + rowPadding + lineHeight - 2);
+    doc.text('Ocorrências', margin + tagColWidth + 6, cursorY + rowPadding + lineHeight - 2);
+    doc.text('Minutagem', margin + tagColWidth + countColWidth + 6, cursorY + rowPadding + lineHeight - 2);
+    cursorY += lineHeight + rowPadding * 2;
+
+    const rows = occurrenceList.length ? occurrenceList : [{ tag: {}, count: 0, times: [] }];
+    rows.forEach((item, index) => {
+      const tag = item.tag || {};
+      const tagName = tag?.nome || 'Nenhuma tag encontrada.';
+      const timesText = (item.times || []).join(', ') || 'Minutagem indisponível';
+      const timeLines = doc.splitTextToSize(timesText, timeColWidth - 8);
+      const rowHeight = Math.max(lineHeight, timeLines.length * lineHeight) + rowPadding;
+
+      ensureSpace(rowHeight);
+      if (index % 2 === 1) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(margin, cursorY, tableWidth, rowHeight, 'F');
+      }
+      const tagColor = tag?.cor ? String(tag.cor).trim() : '';
+      const tagRgb = hexToRgb(tagColor) || { r: 16, g: 185, b: 129 };
+      doc.setFillColor(tagRgb.r, tagRgb.g, tagRgb.b);
+      doc.circle(margin + 10, cursorY + rowPadding + 4, 4, 'F');
+      doc.setTextColor(15, 23, 42);
+      doc.text(tagName, margin + 20, cursorY + rowPadding + lineHeight - 2);
+      doc.text(String(item.count || 0), margin + tagColWidth + 8, cursorY + rowPadding + lineHeight - 2);
+      doc.setTextColor(71, 85, 105);
+      doc.text(timeLines, margin + tagColWidth + countColWidth + 6, cursorY + rowPadding + lineHeight - 2);
+      cursorY += rowHeight;
+    });
+
+    cursorY += 18;
+    ensureSpace(20);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Transcrição completa', margin, cursorY);
+    cursorY += 16;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+
+    const defaultColor = { r: 51, g: 65, b: 85 };
+    const fallbackTagColor = { r: 16, g: 185, b: 129 };
+    let cursorX = margin;
+
+    const writeToken = (tokenText, color, isTagToken) => {
+      doc.setFont('helvetica', isTagToken ? 'bold' : 'normal');
+      const tokenWidth = doc.getTextWidth(tokenText);
+      if (cursorX + tokenWidth > margin + maxWidth && tokenText.trim()) {
+        cursorX = margin;
+        cursorY += lineHeight;
+        ensureSpace(lineHeight);
+      }
+      doc.setTextColor(color.r, color.g, color.b);
+      doc.text(tokenText, cursorX, cursorY);
+      cursorX += tokenWidth;
+    };
+
+    segments.forEach((segment) => {
+      const tokenColor = segment.isTag
+        ? (hexToRgb(segment.color) || fallbackTagColor)
+        : defaultColor;
+      const rawParts = String(segment.text || '').split(/(\s+)/);
+      rawParts.forEach((raw) => {
+        if (raw === '') return;
+        const newlineParts = raw.split('\n');
+        newlineParts.forEach((part, idx) => {
+          if (idx > 0) {
+            cursorX = margin;
+            cursorY += lineHeight;
+            ensureSpace(lineHeight);
+          }
+          if (!part) return;
+          if (part.trim() === '' && cursorX === margin) {
+            return;
+          }
+          writeToken(part, tokenColor, segment.isTag);
+        });
+      });
+    });
+
+    return doc;
   };
 
   const fetchTranscriptionSegments = useCallback(async () => {

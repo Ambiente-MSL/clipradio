@@ -28,6 +28,7 @@
     "date-fns-tz": "^3.0.1",
     "framer-motion": "^10.16.4",
     "hls.js": "^1.5.8",
+    "jspdf": "^4.0.0",
     "lucide-react": "^0.285.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
