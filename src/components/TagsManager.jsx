@@ -6,7 +6,6 @@ import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
 import { Tag as TagIcon, Plus, Edit, Trash2, Loader } from 'lucide-react';
 
@@ -40,6 +39,7 @@ const TagItem = ({ tag, onEdit, onDelete }) => (
 const TagForm = ({ tag, onSave, onCancel, loading }) => {
   const [name, setName] = useState(tag ? tag.nome : '');
   const [color, setColor] = useState(tag ? tag.cor : predefinedColors[5]);
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -55,21 +55,38 @@ const TagForm = ({ tag, onSave, onCancel, loading }) => {
       </div>
       <div>
         <Label className="text-slate-300">Cor</Label>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="w-full justify-start text-left font-normal mt-1">
-              <div className="w-5 h-5 rounded-full mr-2" style={{ backgroundColor: color }} />
-              <span className="text-slate-200">{color}</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-2 bg-slate-800 border-slate-700" data-tag-color-popover>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full justify-start text-left font-normal mt-1"
+          onClick={() => setIsPaletteOpen((prev) => !prev)}
+          aria-expanded={isPaletteOpen}
+          aria-controls="tag-color-palette"
+        >
+          <div className="w-5 h-5 rounded-full mr-2" style={{ backgroundColor: color }} />
+          <span className="text-slate-200">{color}</span>
+        </Button>
+        {isPaletteOpen && (
+          <div
+            id="tag-color-palette"
+            className="mt-2 rounded-md border border-slate-700 bg-slate-800 p-2"
+          >
             <div className="grid grid-cols-6 gap-1">
               {predefinedColors.map((c) => (
-                <button key={c} type="button" onClick={() => setColor(c)} className="w-8 h-8 rounded-full transition-transform hover:scale-110" style={{ backgroundColor: c }} />
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => {
+                    setColor(c);
+                    setIsPaletteOpen(false);
+                  }}
+                  className="w-8 h-8 rounded-full transition-transform hover:scale-110"
+                  style={{ backgroundColor: c }}
+                />
               ))}
             </div>
-          </PopoverContent>
-        </Popover>
+          </div>
+        )}
       </div>
       <DialogFooter className="pt-4">
         <DialogClose asChild>
@@ -150,13 +167,6 @@ const TagsManager = ({ onTagsUpdated }) => {
     setIsDialogOpen(true);
   };
 
-  const handleDialogInteractOutside = (event) => {
-    const target = event?.target;
-    if (target?.closest?.('[data-tag-color-popover]')) {
-      event.preventDefault();
-    }
-  };
-
   return (
     <div className="p-4">
       <div className="flex justify-end mb-4">
@@ -166,10 +176,7 @@ const TagsManager = ({ onTagsUpdated }) => {
               <Plus className="w-4 h-4 mr-2" /> Nova tag
             </Button>
           </DialogTrigger>
-          <DialogContent
-            className="bg-slate-900 border-slate-700 text-white"
-            onInteractOutside={handleDialogInteractOutside}
-          >
+          <DialogContent className="bg-slate-900 border-slate-700 text-white">
             <DialogHeader>
               <DialogTitle className="gradient-text">{editingTag ? 'Editar Tag' : 'Criar nova tag'}</DialogTitle>
             </DialogHeader>
