@@ -13,7 +13,7 @@ const predefinedColors = [
   '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e'
 ];
 
-const TagItem = ({ tag, onEdit, onDelete }) => (
+const TagItem = ({ tag, onEdit, onDelete, canManage }) => (
   <motion.div
     layout
     initial={{ opacity: 0, y: -10 }}
@@ -26,10 +26,22 @@ const TagItem = ({ tag, onEdit, onDelete }) => (
       <span className="font-medium text-slate-200">{tag.nome}</span>
     </div>
     <div className="flex items-center gap-2">
-      <Button variant="ghost" size="icon" onClick={() => onEdit(tag)}>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => onEdit(tag)}
+        disabled={!canManage}
+        title={canManage ? 'Editar tag' : 'Apenas tags da sua conta'}
+      >
         <Edit className="w-4 h-4 text-slate-400" />
       </Button>
-      <Button variant="ghost" size="icon" onClick={() => onDelete(tag)}>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => onDelete(tag)}
+        disabled={!canManage}
+        title={canManage ? 'Excluir tag' : 'Apenas tags da sua conta'}
+      >
         <Trash2 className="w-4 h-4 text-red-500" />
       </Button>
     </div>
@@ -197,7 +209,13 @@ const TagsManager = ({ onTagsUpdated }) => {
         <div className="space-y-3 mt-4 max-h-[50vh] overflow-y-auto pr-2">
           {tags.length > 0 ? (
             tags.map((tag) => (
-              <TagItem key={tag.id} tag={tag} onEdit={handleOpenDialog} onDelete={handleDeleteTag} />
+              <TagItem
+                key={tag.id}
+                tag={tag}
+                onEdit={handleOpenDialog}
+                onDelete={handleDeleteTag}
+                canManage={Boolean(user?.is_admin || (user?.id && tag.user_id === user.id))}
+              />
             ))
           ) : (
             <div className="text-center py-12 text-slate-500">

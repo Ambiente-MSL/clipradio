@@ -1,8 +1,10 @@
 from flask import Blueprint, request, jsonify
+from sqlalchemy import func
 from app import db
 from models.tag import Tag
 from models.gravacao import Gravacao
 from models.gravacao_tag import gravacao_tags
+from models.user import User
 from utils.jwt_utils import token_required, decode_token
 from flask import request as flask_request
 
@@ -24,7 +26,18 @@ def get_tags():
     if ctx.get('is_admin'):
         tags = Tag.query.order_by(Tag.criado_em.desc()).all()
     else:
-        tags = Tag.query.filter_by(user_id=user_id).order_by(Tag.criado_em.desc()).all()
+        user = User.query.get(user_id)
+        user_city = (user.cidade or '').strip() if user else ''
+        if not user_city:
+            tags = Tag.query.filter_by(user_id=user_id).order_by(Tag.criado_em.desc()).all()
+        else:
+            tags = (
+                Tag.query
+                .join(User, Tag.user_id == User.id)
+                .filter(func.lower(User.cidade) == user_city.lower())
+                .order_by(Tag.criado_em.desc())
+                .all()
+            )
     return jsonify([tag.to_dict() for tag in tags]), 200
 
 @bp.route('/<tag_id>', methods=['GET'])
