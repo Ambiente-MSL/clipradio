@@ -85,10 +85,12 @@ const GlobalAudioPlayer = ({ track, onClose }) => {
   };
 
   const formatTime = (time) => {
-    if (isNaN(time) || time === 0) return '00:00';
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    if (!Number.isFinite(time) || time < 0) return '00:00:00';
+    const totalSeconds = Math.floor(time);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   };
 
   const VolumeIcon = () => {
