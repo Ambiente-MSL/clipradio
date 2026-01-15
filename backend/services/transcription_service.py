@@ -1,6 +1,8 @@
 import os
+import queue
 import subprocess
 import threading
+from collections import Counter
 
 from flask import current_app
 
@@ -12,6 +14,77 @@ from services.websocket_service import broadcast_update
 _MODEL = None
 _MODEL_LOCK = threading.Lock()
 _TRANSCRIBE_LOCK = threading.Lock()
+_TRANSCRIBE_QUEUE = queue.Queue()
+_TRANSCRIBE_WORKERS = []
+_TRANSCRIBE_WORKER_LOCK = threading.Lock()
+_TRANSCRIBE_IN_FLIGHT = Counter()
+_TRANSCRIBE_IN_FLIGHT_LOCK = threading.Lock()
+_TRANSCRIBE_ACTIVE = 0
+_TRANSCRIBE_ACTIVE_LOCK = threading.Lock()
+
+
+def _get_transcribe_max_workers():
+    try:
+        return max(1, int(Config.TRANSCRIBE_MAX_CONCURRENT or 1))
+    except Exception:
+        return 1
+
+
+def _ensure_transcribe_workers():
+    max_workers = _get_transcribe_max_workers()
+    with _TRANSCRIBE_WORKER_LOCK:
+        alive_workers = [worker for worker in _TRANSCRIBE_WORKERS if worker.is_alive()]
+        _TRANSCRIBE_WORKERS[:] = alive_workers
+        while len(_TRANSCRIBE_WORKERS) < max_workers:
+            worker = threading.Thread(target=_transcribe_worker, daemon=True)
+            _TRANSCRIBE_WORKERS.append(worker)
+            worker.start()
+
+
+def _transcribe_worker():
+    global _TRANSCRIBE_ACTIVE
+    while True:
+        job = _TRANSCRIBE_QUEUE.get()
+        if job is None:
+            _TRANSCRIBE_QUEUE.task_done()
+            break
+        gravacao_id = job.get("gravacao_id")
+        force = bool(job.get("force"))
+        app_obj = job.get("app_obj")
+
+        with _TRANSCRIBE_ACTIVE_LOCK:
+            _TRANSCRIBE_ACTIVE += 1
+
+        ctx = None
+        try:
+            if app_obj:
+                ctx = app_obj.app_context()
+                ctx.push()
+            try:
+                gravacao = Gravacao.query.get(gravacao_id)
+            except Exception:
+                gravacao = None
+            if gravacao and gravacao.transcricao_cancelada:
+                _commit_transcription(
+                    gravacao,
+                    status="interrompido",
+                    progresso=gravacao.transcricao_progresso or 0,
+                    cancelada=True,
+                )
+            else:
+                transcribe_gravacao(gravacao_id, force=force)
+        finally:
+            if ctx:
+                ctx.pop()
+            with _TRANSCRIBE_ACTIVE_LOCK:
+                _TRANSCRIBE_ACTIVE = max(0, _TRANSCRIBE_ACTIVE - 1)
+            with _TRANSCRIBE_IN_FLIGHT_LOCK:
+                if gravacao_id:
+                    if _TRANSCRIBE_IN_FLIGHT.get(gravacao_id, 0) > 1:
+                        _TRANSCRIBE_IN_FLIGHT[gravacao_id] -= 1
+                    else:
+                        _TRANSCRIBE_IN_FLIGHT.pop(gravacao_id, None)
+            _TRANSCRIBE_QUEUE.task_done()
 
 
 def _get_audio_filepath(gravacao):
@@ -374,9 +447,15 @@ def start_transcription(gravacao_id, *, force=False):
             return True
         if gravacao.transcricao_status == "processando" and not force:
             return True
+        with _TRANSCRIBE_ACTIVE_LOCK:
+            active = _TRANSCRIBE_ACTIVE
+        pending = _TRANSCRIBE_QUEUE.qsize()
+        max_workers = _get_transcribe_max_workers()
+        queued = active >= max_workers or pending > 0
+        initial_status = "fila" if queued else "processando"
         _commit_transcription(
             gravacao,
-            status="processando",
+            status=initial_status,
             erro=None,
             modelo=Config.TRANSCRIBE_MODEL,
             progresso=0,
@@ -388,18 +467,18 @@ def start_transcription(gravacao_id, *, force=False):
     except Exception:
         app_obj = None
 
-    def _runner():
-        ctx = None
-        if app_obj:
-            ctx = app_obj.app_context()
-            ctx.push()
-        try:
-            transcribe_gravacao(gravacao_id, force=force)
-        finally:
-            if ctx:
-                ctx.pop()
+    _ensure_transcribe_workers()
 
-    threading.Thread(target=_runner, daemon=True).start()
+    with _TRANSCRIBE_IN_FLIGHT_LOCK:
+        if not force and _TRANSCRIBE_IN_FLIGHT.get(gravacao_id, 0) > 0:
+            return True
+        _TRANSCRIBE_IN_FLIGHT[gravacao_id] += 1
+
+    _TRANSCRIBE_QUEUE.put({
+        "gravacao_id": gravacao_id,
+        "force": force,
+        "app_obj": app_obj,
+    })
     return True
 
 

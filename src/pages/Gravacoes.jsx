@@ -73,6 +73,8 @@ const buildTranscriptionDownloadName = (gravacao, audioUrl) => {
   return `${baseName}.txt`;
 };
 
+const escapeRegExp = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 
 const StatCard = ({ icon, value, unit, delay, gradient }) => (
 
@@ -249,7 +251,18 @@ const GravacoesFilter = ({ filters, setFilters, radios, estadoOptions, cidadeOpt
 
 
 
-const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAudioTrack, onDelete, isSelected, onToggleSelection }) => {
+const GravacaoItem = ({
+  gravacao,
+  index,
+  isPlaying,
+  onPlay,
+  onStop,
+  setGlobalAudioTrack,
+  onDelete,
+  isSelected,
+  onToggleSelection,
+  availableTags = [],
+}) => {
 
   const { toast } = useToast();
 
@@ -266,6 +279,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
   const [transcriptionFinishedAt, setTranscriptionFinishedAt] = useState(null);
   const [transcriptionLastUpdateAt, setTranscriptionLastUpdateAt] = useState(null);
   const [transcriptionNow, setTranscriptionNow] = useState(Date.now());
+  const [activeTagId, setActiveTagId] = useState(null);
 
   useEffect(() => {
     setTranscriptionData((prev) => ({
@@ -547,6 +561,10 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
     }
   };
 
+  const handleTagToggle = (tagId) => {
+    setActiveTagId((prev) => (prev === tagId ? null : tagId));
+  };
+
   useEffect(() => {
     if (!transcriptionStartedAt && !transcriptionLastUpdateAt) return;
     if (transcriptionFinishedAt) {
@@ -671,6 +689,48 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
     || normalizedTranscriptionProgress >= 100
     || transcriptionData.status === 'concluido'
     || gravacao?.transcricao_status === 'concluido';
+  const activeTag = useMemo(
+    () => (availableTags || []).find((tag) => tag.id === activeTagId) || null,
+    [availableTags, activeTagId]
+  );
+  const highlightedTranscription = useMemo(() => {
+    const text = transcriptionData.texto || '';
+    const label = activeTag?.nome ? String(activeTag.nome).trim() : '';
+    if (!text || !label) return text;
+    const escapedLabel = escapeRegExp(label);
+    if (!escapedLabel) return text;
+    const regex = new RegExp(`\\b${escapedLabel}\\b`, 'gi');
+    const tagColor = activeTag?.cor ? String(activeTag.cor).trim() : '';
+    const useCustomColor = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(tagColor);
+    const highlightStyle = useCustomColor
+      ? { backgroundColor: `${tagColor}33`, borderColor: tagColor }
+      : undefined;
+    const nodes = [];
+    let lastIndex = 0;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      const start = match.index;
+      const end = start + match[0].length;
+      if (start > lastIndex) {
+        nodes.push(text.slice(lastIndex, start));
+      }
+      nodes.push(
+        <span
+          key={`tag-${start}-${end}`}
+          className="rounded px-1 py-0.5 font-semibold border border-emerald-400/40 bg-emerald-400/20 text-emerald-200"
+          style={highlightStyle}
+        >
+          {match[0]}
+        </span>
+      );
+      lastIndex = end;
+    }
+    if (!nodes.length) return text;
+    if (lastIndex < text.length) {
+      nodes.push(text.slice(lastIndex));
+    }
+    return nodes;
+  }, [transcriptionData.texto, activeTag]);
   return (
 
     <motion.div layout="position" initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -50, scale: 0.9 }} transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', stiffness: 120 }} className={`card-item flex flex-col p-4 gap-4 transition-colors duration-200 ${isSelected ? 'bg-primary/10 border-primary' : 'border-transparent'}`}>
@@ -783,6 +843,33 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
               Progresso: {progressValue}% | Tempo percorrido: {elapsedLabel} | Última atualização: {idleLabel}
             </div>
           </div>
+          {Array.isArray(availableTags) && availableTags.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {availableTags.map((tag) => {
+                const isActive = activeTagId === tag.id;
+                const tagColor = tag?.cor ? String(tag.cor).trim() : '';
+                const useCustomColor = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(tagColor);
+                const buttonStyle = useCustomColor
+                  ? { borderColor: tagColor, backgroundColor: isActive ? `${tagColor}33` : undefined }
+                  : undefined;
+                const buttonClass = isActive
+                  ? 'border-emerald-400/60 text-emerald-100'
+                  : 'border-slate-800/70 text-slate-300';
+                return (
+                  <Button
+                    key={tag.id}
+                    size="sm"
+                    variant="outline"
+                    className={buttonClass}
+                    style={buttonStyle}
+                    onClick={() => handleTagToggle(tag.id)}
+                  >
+                    {tag.nome}
+                  </Button>
+                );
+              })}
+            </div>
+          )}
           <div className="mt-3 h-2 w-full rounded-full bg-slate-800/80 overflow-hidden">
             <div className="h-full bg-emerald-400 transition-all duration-300" style={{ width: `${progressValue}%` }} />
           </div>
@@ -793,7 +880,7 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
                 Parando transcrição...
               </div>
             ) : transcriptionData.texto ? (
-              <p className="whitespace-pre-wrap leading-relaxed">{transcriptionData.texto}</p>
+              <p className="whitespace-pre-wrap leading-relaxed">{highlightedTranscription}</p>
             ) : isTranscriptionLoading ? (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader className="w-4 h-4 animate-spin" />
@@ -838,6 +925,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
   const [gravacoes, setGravacoes] = useState([]);
   const [agendamentos, setAgendamentos] = useState([]);
   const [radios, setRadios] = useState([]);
+  const [availableTags, setAvailableTags] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ totalGravacoes: 0, totalDuration: 0, totalSize: 0, uniqueRadios: 0 });
   const ITEMS_PER_PAGE = 10;
@@ -912,6 +1000,15 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
   }, [toast]);
 
+  const fetchTags = useCallback(async () => {
+    try {
+      const data = await apiClient.getTags();
+      setAvailableTags(data || []);
+    } catch (error) {
+      toast({ title: 'Erro ao buscar tags', description: error.message, variant: 'destructive' });
+    }
+  }, [toast]);
+
 
 
   const fetchGravacoes = useCallback(async () => {
@@ -965,6 +1062,10 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
     fetchRadios();
 
   }, [fetchRadios]);
+
+  useEffect(() => {
+    fetchTags();
+  }, [fetchTags]);
 
   useEffect(() => {
     if (!filters.cidade) return;
@@ -1439,6 +1540,8 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
                       setGlobalAudioTrack={setGlobalAudioTrack}
 
+                      availableTags={availableTags}
+
                       onDelete={handleDeleteLocal}
 
                       isSelected={selectedIds.has(gravacao.id)}
@@ -1495,6 +1598,8 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
                       setGlobalAudioTrack={setGlobalAudioTrack}
 
+                      availableTags={availableTags}
+
                       onDelete={handleDeleteLocal}
 
                       isSelected={selectedIds.has(gravacao.id)}
@@ -1548,6 +1653,8 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
                     onStop={handleStop}
 
                     setGlobalAudioTrack={setGlobalAudioTrack}
+
+                    availableTags={availableTags}
 
                     onDelete={handleDeleteLocal}
 
