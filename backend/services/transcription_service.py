@@ -229,9 +229,6 @@ def transcribe_gravacao(gravacao_id, *, force=False):
     if gravacao.transcricao_texto and not force:
         return True
 
-    if gravacao.transcricao_status == "processando" and not force:
-        return True
-
     filepath = _resolve_audio_filepath(gravacao)
     if not filepath or not os.path.exists(filepath):
         _commit_transcription(
