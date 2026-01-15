@@ -747,7 +747,15 @@ const GravacaoItem = ({
     const highlightStyle = useCustomColor
       ? { backgroundColor: `${tagColor}33`, borderColor: tagColor }
       : undefined;
-    const highlightClass = "rounded px-1 py-0.5 font-semibold border border-emerald-400/40 bg-emerald-400/20 text-emerald-200";
+    const highlightClass = "relative inline-block rounded px-1 py-0.5 font-semibold border border-emerald-400/40 bg-emerald-400/20 text-emerald-200 cursor-help";
+    const renderHighlight = (key, value, tooltipText) => (
+      <span key={key} className={`${highlightClass} group`} style={highlightStyle}>
+        {value}
+        <span className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-slate-700 bg-slate-900/95 px-2 py-1 text-[10px] font-semibold text-slate-100 shadow-lg opacity-0 scale-95 transition-all duration-100 group-hover:opacity-100 group-hover:scale-100">
+          {tooltipText}
+        </span>
+      </span>
+    );
 
     if (Array.isArray(transcriptionSegments) && transcriptionSegments.length > 0) {
       const nodes = [];
@@ -772,14 +780,7 @@ const GravacaoItem = ({
             segmentNodes.push(segmentText.slice(lastIndex, start));
           }
           segmentNodes.push(
-            <span
-              key={`tag-${segmentIndex}-${start}-${end}`}
-              className={highlightClass}
-              style={highlightStyle}
-              title={tooltip}
-            >
-              {match[0]}
-            </span>
+            renderHighlight(`tag-${segmentIndex}-${start}-${end}`, match[0], tooltip)
           );
           lastIndex = end;
         }
@@ -805,14 +806,7 @@ const GravacaoItem = ({
         nodes.push(text.slice(lastIndex, start));
       }
       nodes.push(
-        <span
-          key={`tag-${start}-${end}`}
-          className={highlightClass}
-          style={highlightStyle}
-          title="Minutagem indisponível"
-        >
-          {match[0]}
-        </span>
+        renderHighlight(`tag-${start}-${end}`, match[0], 'Minutagem indisponível')
       );
       lastIndex = end;
     }

@@ -62,7 +62,7 @@ const TagForm = ({ tag, onSave, onCancel, loading }) => {
               <span className="text-slate-200">{color}</span>
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-2 bg-slate-800 border-slate-700">
+          <PopoverContent className="w-auto p-2 bg-slate-800 border-slate-700" data-tag-color-popover>
             <div className="grid grid-cols-6 gap-1">
               {predefinedColors.map((c) => (
                 <button key={c} type="button" onClick={() => setColor(c)} className="w-8 h-8 rounded-full transition-transform hover:scale-110" style={{ backgroundColor: c }} />
@@ -150,6 +150,13 @@ const TagsManager = ({ onTagsUpdated }) => {
     setIsDialogOpen(true);
   };
 
+  const handleDialogInteractOutside = (event) => {
+    const target = event?.target;
+    if (target?.closest?.('[data-tag-color-popover]')) {
+      event.preventDefault();
+    }
+  };
+
   return (
     <div className="p-4">
       <div className="flex justify-end mb-4">
@@ -159,7 +166,10 @@ const TagsManager = ({ onTagsUpdated }) => {
               <Plus className="w-4 h-4 mr-2" /> Nova tag
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-slate-900 border-slate-700 text-white">
+          <DialogContent
+            className="bg-slate-900 border-slate-700 text-white"
+            onInteractOutside={handleDialogInteractOutside}
+          >
             <DialogHeader>
               <DialogTitle className="gradient-text">{editingTag ? 'Editar Tag' : 'Criar nova tag'}</DialogTitle>
             </DialogHeader>

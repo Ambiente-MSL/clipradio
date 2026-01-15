@@ -6,10 +6,22 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 
 const GlobalAudioPlayer = ({ track, onClose }) => {
   const audioRef = useRef(null);
+  const playerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStateRef = useRef({
+    active: false,
+    startX: 0,
+    startY: 0,
+    originX: 0,
+    originY: 0,
+    rect: null,
+  });
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -37,6 +49,14 @@ const GlobalAudioPlayer = ({ track, onClose }) => {
     return () => {
       audio.removeEventListener('canplay', handleCanPlay);
     };
+  }, [track]);
+
+  useEffect(() => {
+    const isOpen = Boolean(track);
+    if (isOpen && !wasOpenRef.current) {
+      setDragOffset({ x: 0, y: 0 });
+    }
+    wasOpenRef.current = isOpen;
   }, [track]);
 
   useEffect(() => {
@@ -84,6 +104,56 @@ const GlobalAudioPlayer = ({ track, onClose }) => {
     setProgress(scrubTime);
   };
 
+  const handlePointerDown = (event) => {
+    if (event.button !== 0) return;
+    const target = event.target;
+    if (target?.closest?.('button, input, textarea, select, [data-no-drag]')) {
+      return;
+    }
+    const rect = playerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    dragStateRef.current = {
+      active: true,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: dragOffset.x,
+      originY: dragOffset.y,
+      rect,
+    };
+    setIsDragging(true);
+    playerRef.current?.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  };
+
+  const handlePointerMove = (event) => {
+    const state = dragStateRef.current;
+    if (!state.active) return;
+    const dx = event.clientX - state.startX;
+    const dy = event.clientY - state.startY;
+    const padding = 8;
+    const minDx = -(state.rect.left - padding);
+    const maxDx = (window.innerWidth - padding) - state.rect.right;
+    const minDy = -(state.rect.top - padding);
+    const maxDy = (window.innerHeight - padding) - state.rect.bottom;
+    const clampedDx = Math.min(maxDx, Math.max(minDx, dx));
+    const clampedDy = Math.min(maxDy, Math.max(minDy, dy));
+    setDragOffset({
+      x: state.originX + clampedDx,
+      y: state.originY + clampedDy,
+    });
+  };
+
+  const handlePointerUp = (event) => {
+    if (!dragStateRef.current.active) return;
+    dragStateRef.current.active = false;
+    setIsDragging(false);
+    try {
+      playerRef.current?.releasePointerCapture?.(event.pointerId);
+    } catch (error) {
+      // ignore
+    }
+  };
+
   const formatTime = (time) => {
     if (!Number.isFinite(time) || time < 0) return '00:00:00';
     const totalSeconds = Math.floor(time);
@@ -117,11 +187,20 @@ const GlobalAudioPlayer = ({ track, onClose }) => {
     <AnimatePresence>
       {track && (
         <motion.div
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 100, opacity: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-2xl bg-slate-800/80 backdrop-blur-lg border border-slate-700 rounded-xl shadow-2xl z-50"
+          ref={playerRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          className={`fixed bottom-4 left-1/2 w-[95%] max-w-2xl bg-slate-800/80 backdrop-blur-lg border border-slate-700 rounded-xl shadow-2xl z-50 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+          style={{
+            transform: `translate3d(calc(-50% + ${dragOffset.x}px), ${dragOffset.y}px, 0)`,
+            touchAction: 'none',
+          }}
         >
           <audio
             ref={audioRef}
@@ -141,7 +220,11 @@ const GlobalAudioPlayer = ({ track, onClose }) => {
               <p className="text-sm text-slate-400 truncate">{track.details}</p>
               <div className="flex items-center space-x-2 mt-2">
                 <span className="text-xs text-slate-400 font-mono">{formatTime(displayProgress)}</span>
-                <div className="w-full bg-slate-600 rounded-full h-1.5 cursor-pointer" onClick={handleScrub}>
+                <div
+                  className="w-full bg-slate-600 rounded-full h-1.5 cursor-pointer"
+                  onClick={handleScrub}
+                  data-no-drag
+                >
                   <div
                     className="bg-cyan-400 h-1.5 rounded-full"
                     style={{ width: `${getProgressWidth()}%` }}
@@ -156,7 +239,7 @@ const GlobalAudioPlayer = ({ track, onClose }) => {
                   <VolumeIcon />
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-28 bg-slate-800/80 backdrop-blur-lg border-slate-700 p-2">
+              <PopoverContent className="w-28 bg-slate-800/80 backdrop-blur-lg border-slate-700 p-2" data-no-drag>
                 <Slider
                   defaultValue={[volume * 100]}
                   max={100}
