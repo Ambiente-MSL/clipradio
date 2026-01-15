@@ -665,7 +665,10 @@ const GravacaoItem = ({ gravacao, index, isPlaying, onPlay, onStop, setGlobalAud
   const isStalled = idleSeconds !== null
     && idleSeconds >= 90
     && ['processando', 'fila'].includes(transcriptionData.status);
+  const transcriptionProgress = Number(gravacao?.transcricao_progresso ?? transcriptionData.progresso ?? 0);
+  const normalizedTranscriptionProgress = Number.isFinite(transcriptionProgress) ? transcriptionProgress : 0;
   const hasTranscription = Boolean(gravacao?.transcricao_disponivel)
+    || normalizedTranscriptionProgress >= 100
     || transcriptionData.status === 'concluido'
     || gravacao?.transcricao_status === 'concluido';
   return (
