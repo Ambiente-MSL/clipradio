@@ -263,12 +263,13 @@ const GravacaoItem = ({
   isSelected,
   onToggleSelection,
   availableTags = [],
+  openTranscriptionId,
+  onOpenTranscription,
 }) => {
 
   const { toast } = useToast();
 
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isTranscriptionOpen, setIsTranscriptionOpen] = useState(false);
   const [isTranscriptionLoading, setIsTranscriptionLoading] = useState(false);
   const [transcriptionData, setTranscriptionData] = useState({
     status: gravacao?.transcricao_status || null,
@@ -295,6 +296,14 @@ const GravacaoItem = ({
       progresso: gravacao?.transcricao_progresso ?? prev.progresso ?? 0,
     }));
   }, [gravacao?.transcricao_status, gravacao?.transcricao_erro, gravacao?.transcricao_texto, gravacao?.transcricao_progresso]);
+
+  const isTranscriptionOpen = openTranscriptionId === gravacao?.id;
+
+  useEffect(() => {
+    if (!isTranscriptionOpen) {
+      setIsTranscriptionLoading(false);
+    }
+  }, [isTranscriptionOpen]);
 
 
 
@@ -409,7 +418,9 @@ const GravacaoItem = ({
 
   const handleToggleTranscription = async () => {
     if (isTranscriptionOpen) {
-      setIsTranscriptionOpen(false);
+      if (onOpenTranscription) {
+        onOpenTranscription(null);
+      }
       setIsTranscriptionLoading(false);
       return;
     }
@@ -420,7 +431,9 @@ const GravacaoItem = ({
     }
 
     if (!gravacao?.id) return;
-    setIsTranscriptionOpen(true);
+    if (onOpenTranscription) {
+      onOpenTranscription(gravacao.id);
+    }
 
     setIsTranscriptionLoading(true);
     try {
@@ -443,7 +456,9 @@ const GravacaoItem = ({
 
     if (!gravacao?.id) return;
 
-    setIsTranscriptionOpen(true);
+    if (onOpenTranscription) {
+      onOpenTranscription(gravacao.id);
+    }
     setIsTranscriptionLoading(true);
     try {
       const data = await apiClient.getTranscricao(gravacao.id);
@@ -488,7 +503,9 @@ const GravacaoItem = ({
 
     if (!gravacao?.id) return;
 
-    setIsTranscriptionOpen(true);
+    if (onOpenTranscription) {
+      onOpenTranscription(gravacao.id);
+    }
     setIsTranscriptionLoading(true);
     try {
       if (gravacao.status !== 'concluido') {
@@ -685,18 +702,6 @@ const GravacaoItem = ({
   ]);
 
   useEffect(() => {
-    if (!activeTagId) return;
-    if (!matchedTags.length) {
-      setActiveTagId(null);
-      return;
-    }
-    const stillAvailable = matchedTags.some((tag) => tag.id === activeTagId);
-    if (!stillAvailable) {
-      setActiveTagId(null);
-    }
-  }, [activeTagId, matchedTags]);
-
-  useEffect(() => {
     return () => {
       if (tooltipRafRef.current) {
         window.cancelAnimationFrame(tooltipRafRef.current);
@@ -805,6 +810,18 @@ const GravacaoItem = ({
     () => (matchedTags || []).find((tag) => tag.id === activeTagId) || null,
     [matchedTags, activeTagId]
   );
+
+  useEffect(() => {
+    if (!activeTagId) return;
+    if (!matchedTags.length) {
+      setActiveTagId(null);
+      return;
+    }
+    const stillAvailable = matchedTags.some((tag) => tag.id === activeTagId);
+    if (!stillAvailable) {
+      setActiveTagId(null);
+    }
+  }, [activeTagId, matchedTags]);
   const highlightedTranscription = useMemo(() => {
     const text = transcriptionData.texto || '';
     const label = activeTag?.nome ? String(activeTag.nome).trim() : '';
@@ -1116,6 +1133,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
   const [filters, setFilters] = useState({ radioId: initialRadioId, data: '', cidade: '', estado: '' });
   const [currentPlayingId, setCurrentPlayingId] = useState(null);
+  const [openTranscriptionId, setOpenTranscriptionId] = useState(null);
 
   useEffect(() => {
     const handleGlobalAudioClosed = () => setCurrentPlayingId(null);
@@ -1718,6 +1736,10 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
                       availableTags={availableTags}
 
+                      openTranscriptionId={openTranscriptionId}
+
+                      onOpenTranscription={setOpenTranscriptionId}
+
                       onDelete={handleDeleteLocal}
 
                       isSelected={selectedIds.has(gravacao.id)}
@@ -1776,6 +1798,10 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
                       availableTags={availableTags}
 
+                      openTranscriptionId={openTranscriptionId}
+
+                      onOpenTranscription={setOpenTranscriptionId}
+
                       onDelete={handleDeleteLocal}
 
                       isSelected={selectedIds.has(gravacao.id)}
@@ -1831,6 +1857,10 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
                     setGlobalAudioTrack={setGlobalAudioTrack}
 
                     availableTags={availableTags}
+
+                    openTranscriptionId={openTranscriptionId}
+
+                    onOpenTranscription={setOpenTranscriptionId}
 
                     onDelete={handleDeleteLocal}
 
