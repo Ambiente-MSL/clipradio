@@ -6,6 +6,7 @@ import { LogOut, User, LayoutDashboard, Radio, Calendar, FileText, Mic, Tag, Cir
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { Button } from '@/components/ui/button';
 import Logo from '@/components/Logo';
+import apiClient from '@/lib/apiClient';
 
 const baseNavItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -19,12 +20,92 @@ const adminNavItems = [
   { name: 'Admin', path: '/admin', icon: Shield },
 ];
 
+const parseTimestamp = (value) => {
+  if (!value) return null;
+  const ms = new Date(value).getTime();
+  return Number.isNaN(ms) ? null : ms;
+};
+
+const formatProgressTime = (seconds) => {
+  if (!Number.isFinite(seconds) || seconds < 0) return '--:--';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) {
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+};
+
+const getDurationSeconds = (record) => {
+  const secondsValue = Number(record?.duracao_segundos ?? record?.duration_seconds);
+  if (Number.isFinite(secondsValue) && secondsValue > 0) return secondsValue;
+  const minutesValue = Number(
+    record?.duracao_minutos ??
+    record?.duracao ??
+    record?.duration_minutes
+  );
+  if (Number.isFinite(minutesValue) && minutesValue > 0) return minutesValue * 60;
+  return 0;
+};
+
+const normalizeOngoingRecord = (record) => {
+  if (!record) return null;
+  const id = record?.id != null ? String(record.id) : null;
+  if (!id) return null;
+  return {
+    id,
+    radioNome: record.radioNome || record?.radios?.nome || record?.nome || '',
+    startedAt: record.startedAt || record?.criado_em || record?.data_inicio || record?.created_at,
+    durationSeconds: getDurationSeconds(record),
+    status: record?.status || 'gravando',
+    tipo: record?.tipo,
+  };
+};
+
+const mergeOngoingRecords = (prev, next, nowMs) => {
+  const prevMap = new Map(prev.map((rec) => [rec.id, rec]));
+  const nextMap = new Map();
+
+  next.forEach((rec) => {
+    if (!rec?.id) return;
+    const existing = prevMap.get(rec.id);
+    const merged = existing
+      ? { ...existing, ...rec, radioNome: rec.radioNome || existing.radioNome }
+      : rec;
+    nextMap.set(rec.id, merged);
+  });
+
+  prev.forEach((rec) => {
+    if (!rec?.id || nextMap.has(rec.id)) return;
+    const startMs = parseTimestamp(rec.startedAt);
+    const durationSeconds = rec.durationSeconds || 0;
+    if (startMs && durationSeconds) {
+      const endMs = startMs + durationSeconds * 1000 + 60000;
+      if (nowMs <= endMs) {
+        nextMap.set(rec.id, rec);
+      }
+      return;
+    }
+    if (startMs && nowMs - startMs <= 6 * 60 * 60 * 1000) {
+      nextMap.set(rec.id, rec);
+    }
+  });
+
+  return Array.from(nextMap.values()).sort((a, b) => {
+    const aStart = parseTimestamp(a.startedAt) || 0;
+    const bStart = parseTimestamp(b.startedAt) || 0;
+    return bStart - aStart;
+  });
+};
+
 const Navbar = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [showRecordingPanel, setShowRecordingPanel] = useState(false);
   const [ongoingRecords, setOngoingRecords] = useState([]);
+  const [now, setNow] = useState(Date.now());
   const navItems = useMemo(
     () => (user?.is_admin ? [...baseNavItems, ...adminNavItems] : baseNavItems),
     [user],
@@ -41,24 +122,43 @@ const Navbar = () => {
   useEffect(() => {
     const handler = (event) => {
       const detail = event.detail || {};
+      const normalized = normalizeOngoingRecord(detail);
+      if (!normalized) return;
       setOngoingRecords((prev) => {
-        if (prev.some((r) => r.id === detail.id)) return prev;
-        return [
-          {
-            id: detail.id,
-            radioNome: detail.radioNome || 'Radio',
-            duracao: detail.duracao,
-            startedAt: detail.startedAt,
-            status: detail.status || 'gravando',
-          },
-          ...prev,
-        ];
+        if (prev.some((r) => r.id === normalized.id)) return prev;
+        return [normalized, ...prev];
       });
       setShowRecordingPanel(true);
     };
     window.addEventListener('recording-started', handler);
     return () => window.removeEventListener('recording-started', handler);
   }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    const fetchOngoing = async () => {
+      try {
+        const data = await apiClient.getOngoingRecordings();
+        if (cancelled) return;
+        const normalized = (data || []).map(normalizeOngoingRecord).filter(Boolean);
+        setOngoingRecords((prev) => mergeOngoingRecords(prev, normalized, Date.now()));
+      } catch (error) {
+        // Ignore polling errors to keep the navbar responsive.
+      }
+    };
+    fetchOngoing();
+    const interval = setInterval(fetchOngoing, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -125,20 +225,51 @@ const Navbar = () => {
                   {ongoingRecords.length === 0 ? (
                     <div className="px-4 py-6 text-sm text-slate-400 text-center">Nenhuma gravação no momento.</div>
                   ) : (
-                    ongoingRecords.map((rec) => (
-                      <div key={rec.id} className="px-4 py-3 flex items-center justify-between border-b border-slate-800 last:border-0">
-                        <div className="flex items-center gap-3">
-                          <CircleDot className="w-4 h-4 text-red-400 animate-pulse" />
-                          <div>
-                            <p className="text-sm font-semibold text-white">{rec.radioNome}</p>
-                            <p className="text-xs text-slate-400">Duração: {rec.duracao} min</p>
+                    ongoingRecords.map((rec) => {
+                      const startMs = parseTimestamp(rec.startedAt);
+                      const elapsedSeconds = startMs ? Math.max(0, Math.floor((now - startMs) / 1000)) : 0;
+                      const durationSeconds = rec.durationSeconds || 0;
+                      const progressPercent = durationSeconds > 0
+                        ? Math.min(100, (elapsedSeconds / durationSeconds) * 100)
+                        : 100;
+                      const statusValue = String(rec.status || '').toLowerCase();
+                      const statusLabel = statusValue === 'parando'
+                        ? 'Parando'
+                        : statusValue === 'processando'
+                          ? 'Processando'
+                          : statusValue === 'iniciando' && elapsedSeconds < 8
+                            ? 'Iniciando'
+                            : 'Gravando';
+                      const barClass = durationSeconds > 0
+                        ? 'bg-gradient-to-r from-cyan-400 via-emerald-400 to-lime-400'
+                        : 'bg-slate-600/60 animate-pulse';
+                      return (
+                        <div key={rec.id} className="px-4 py-3 border-b border-slate-800 last:border-0">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                              <CircleDot className="w-4 h-4 text-red-400 animate-pulse mt-0.5" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold text-white truncate">{rec.radioNome || 'Radio'}</p>
+                                <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                                  <span>{formatProgressTime(elapsedSeconds)}</span>
+                                  <span>{formatProgressTime(durationSeconds)}</span>
+                                </div>
+                                <div className="mt-2 h-1.5 w-full rounded-full bg-slate-800/80 overflow-hidden">
+                                  <div
+                                    className={`h-full transition-[width] duration-500 ${barClass}`}
+                                    style={{ width: `${progressPercent}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-slate-300 px-2 py-1 rounded-full bg-slate-800 border border-slate-700 whitespace-nowrap">
+                              {statusLabel}
+                            </span>
                           </div>
                         </div>
-                        <span className="text-xs text-slate-300 px-2 py-1 rounded-full bg-slate-800 border border-slate-700">
-                          {rec.status === 'gravando' ? 'Gravando' : 'Iniciando'}
-                        </span>
-                      </div>
-                    ))
+                      );
+                    })
+
                   )}
                 </div>
                 <NavLink

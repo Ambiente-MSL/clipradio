@@ -1439,6 +1439,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
   const [listMeta, setListMeta] = useState({ page: 1, per_page: ITEMS_PER_PAGE, total: 0, total_pages: 0 });
   const [ongoingLive, setOngoingLive] = useState([]);
   const [loadingOngoing, setLoadingOngoing] = useState(false);
+  const [liveNow, setLiveNow] = useState(Date.now());
   const location = useLocation();
 
   const searchParams = new URLSearchParams(location.search);
@@ -1609,6 +1610,12 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const timer = setInterval(() => setLiveNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+
 
 
   const handlePlay = (id) => setCurrentPlayingId(id);
@@ -1644,6 +1651,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
     switch (gravacao.status) {
       case 'iniciando':
         return { label: 'Gravando', className: 'bg-red-500/15 border-red-500/40 text-red-200 animate-pulse' };
+      case 'em_execucao':
       case 'gravando':
         return { label: 'Gravando', className: 'bg-red-500/15 border-red-500/40 text-red-200 animate-pulse' };
       case 'processando':
@@ -1653,6 +1661,44 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
       default:
         return { label: gravacao.status || 'Desconhecido', className: 'bg-slate-700/40 border-slate-600 text-slate-200' };
     }
+  };
+
+  const parseTimestamp = (value) => {
+    if (!value) return null;
+    const ms = new Date(value).getTime();
+    return Number.isNaN(ms) ? null : ms;
+  };
+
+  const formatLiveTime = (seconds) => {
+    if (!Number.isFinite(seconds) || seconds < 0) return '--:--';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    if (h > 0) {
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  const getLiveDurationSeconds = (gravacao) => {
+    const secondsValue = Number(gravacao?.duracao_segundos ?? gravacao?.duration_seconds);
+    if (Number.isFinite(secondsValue) && secondsValue > 0) return secondsValue;
+    const minutesValue = Number(
+      gravacao?.duracao_minutos ??
+      gravacao?.duracao ??
+      gravacao?.duration_minutes
+    );
+    if (Number.isFinite(minutesValue) && minutesValue > 0) return minutesValue * 60;
+    return 0;
+  };
+
+  const buildLiveKey = (gravacao) => {
+    const radioId = gravacao?.radio_id || gravacao?.radioId || gravacao?.radios?.id;
+    const startedAt = gravacao?.criado_em || gravacao?.data_inicio || gravacao?.started_at;
+    if (!radioId || !startedAt) return null;
+    const startMs = parseTimestamp(startedAt);
+    if (!startMs) return null;
+    return `${radioId}-${Math.floor(startMs / 60000)}`;
   };
 
 
@@ -1784,13 +1830,35 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
       }),
     [concludedGravacoes]
   );
-  const ongoingGravacoes = useMemo(
-    () => ongoingLive.map((g) => ({
+  const scheduledOngoing = useMemo(() => {
+    const activeStatuses = new Set(['em_execucao', 'gravando', 'iniciando']);
+    return agendamentos
+      .filter((ag) => activeStatuses.has(String(ag.status || '').toLowerCase()))
+      .map((ag) => ({
+        id: `ag-live-${ag.id}`,
+        radio_id: ag.radio_id,
+        radios: ag.radios || radios.find((r) => r.id === ag.radio_id),
+        criado_em: ag.data_inicio,
+        status: ag.status || 'em_execucao',
+        duracao_segundos: (ag.duracao_minutos || 0) * 60,
+        tipo: 'agendado',
+      }));
+  }, [agendamentos, radios]);
+
+  const ongoingGravacoes = useMemo(() => {
+    const apiItems = ongoingLive.map((g) => ({
       ...g,
       radios: g.radios || radios.find((r) => r.id === g.radio_id),
-    })),
-    [ongoingLive, radios]
-  );
+    }));
+    const liveKeys = new Set(apiItems.map(buildLiveKey).filter(Boolean));
+    const merged = [...apiItems];
+    scheduledOngoing.forEach((ag) => {
+      const key = buildLiveKey(ag);
+      if (key && liveKeys.has(key)) return;
+      merged.push(ag);
+    });
+    return merged;
+  }, [ongoingLive, radios, scheduledOngoing]);
 
   const totalCount = activeTab === 'live'
     ? ongoingGravacoes.length
@@ -1952,57 +2020,150 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
                 )}
 
                 {ongoingGravacoes.map((gravacao, idx) => {
+
                   const statusInfo = getOngoingStatus(gravacao);
-                  const canStop = ['gravando', 'iniciando', 'processando'].includes(gravacao.status);
+
+                  const statusValue = String(gravacao.status || '').toLowerCase();
+
+                  const isScheduled = String(gravacao.id || '').startsWith('ag-');
+
+                  const canStop = !isScheduled && ['gravando', 'iniciando', 'processando', 'em_execucao'].includes(statusValue);
+
                   const tipoLabel = gravacao.tipo === 'agendado' ? 'Agendado' : gravacao.tipo === 'manual' ? 'Manual' : gravacao.tipo || 'Outro';
+
+                  const startMs = parseTimestamp(gravacao.criado_em || gravacao.data_inicio || gravacao.started_at);
+
+                  const elapsedSeconds = startMs ? Math.max(0, Math.floor((liveNow - startMs) / 1000)) : 0;
+
+                  const durationSeconds = getLiveDurationSeconds(gravacao);
+
+                  const progressPercent = durationSeconds > 0
+
+                    ? Math.min(100, (elapsedSeconds / durationSeconds) * 100)
+
+                    : 100;
+
+                  const barClass = durationSeconds > 0
+
+                    ? 'bg-gradient-to-r from-cyan-400 via-emerald-400 to-lime-400'
+
+                    : 'bg-slate-600/60 animate-pulse';
+
                   return (
 
+
                     <div
+
                       key={gravacao.id}
+
                       className={`px-4 py-3 flex items-center justify-between ${idx !== ongoingGravacoes.length - 1 ? 'border-b border-slate-800/80' : ''}`}
+
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="flex flex-col">
-                          <span className="text-white font-semibold">{gravacao.radios?.nome || 'Rádio'}</span>
+
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+
+                        <div className="flex flex-col flex-1 min-w-0">
+
+                          <span className="text-white font-semibold">{gravacao.radios?.nome || 'Radio'}</span>
+
                           <div className="flex items-center gap-2 text-xs text-slate-400">
-                            <span>Iniciada em {format(new Date(gravacao.criado_em), "d MMM 'às' HH:mm", { locale: ptBR })}</span>
+
+                            <span>Iniciada em {format(new Date(gravacao.criado_em), "d MMM '??s' HH:mm", { locale: ptBR })}</span>
+
                             <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-200 uppercase tracking-wide">
+
                               {tipoLabel}
+
                             </span>
+
                           </div>
+
+                          <div className="mt-2">
+
+                            <div className="h-1.5 w-full rounded-full bg-slate-800/80 overflow-hidden">
+
+                              <div
+
+                                className={`h-full transition-[width] duration-500 ${barClass}`}
+
+                                style={{ width: `${progressPercent}%` }}
+
+                              />
+
+                            </div>
+
+                            <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+
+                              <span>{formatLiveTime(elapsedSeconds)}</span>
+
+                              <span>{formatLiveTime(durationSeconds)}</span>
+
+                            </div>
+
+                          </div>
+
                         </div>
+
                       </div>
+
                       <div className="flex items-center gap-3">
+
                         {canStop && (
+
                           <Button
+
                             size="sm"
+
                             variant="destructive"
+
                             className="h-8 px-3"
+
                             onClick={() => handleStopRecording(gravacao)}
+
                             disabled={stoppingId === gravacao.id}
+
                           >
+
                             {stoppingId === gravacao.id ? (
+
                               <>
+
                                 <Loader className="w-3.5 h-3.5 mr-1 animate-spin" />
+
                                 Parando...
+
                               </>
+
                             ) : (
+
                               <>
+
                                 <Square className="w-3.5 h-3.5 mr-1" />
+
                                 Parar
+
                               </>
+
                             )}
+
                           </Button>
+
                         )}
+
                         <span className={`text-sm px-3 py-1 rounded-full border ${statusInfo.className}`}>
+
                           {statusInfo.label}
+
                         </span>
+
                       </div>
+
                     </div>
 
-                  );
-                })}
 
+                  );
+
+                })}
 
               </div>
 
