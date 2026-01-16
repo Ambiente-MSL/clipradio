@@ -52,9 +52,17 @@ const CadastroRadios = () => {
   const { toast } = useToast()
   const { user } = useAuth()
   const ITEMS_PER_PAGE = 10
+  const isFavoriteForUser = useCallback(
+    (radio) => {
+      if (!radio?.favorita) return false
+      if (!user?.id) return true
+      return radio.user_id === user.id
+    },
+    [user?.id],
+  )
   const filteredRadios = useMemo(
-    () => (showFavoritesOnly ? radios.filter((radio) => radio.favorita) : radios),
-    [radios, showFavoritesOnly],
+    () => (showFavoritesOnly ? radios.filter(isFavoriteForUser) : radios),
+    [radios, showFavoritesOnly, isFavoriteForUser],
   )
   const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredRadios.length / ITEMS_PER_PAGE)), [filteredRadios.length])
   const paginatedRadios = useMemo(() => {
@@ -611,7 +619,7 @@ const CadastroRadios = () => {
                               disabled={!canManageRadio(radio)}
                               className="h-8 w-8 flex-shrink-0 hover:bg-yellow-500/10 transition-colors"
                             >
-                              {radio.favorita ? (
+                              {isFavoriteForUser(radio) ? (
                                 <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
                               ) : (
                                 <StarOff className="w-4 h-4 text-slate-500 group-hover:text-yellow-400/50 transition-colors" />
@@ -738,7 +746,7 @@ const CadastroRadios = () => {
                           disabled={!canManageRadio(radio)}
                           className="text-yellow-400 flex-shrink-0"
                         >
-                          {radio.favorita ? <Star className="w-5 h-5" /> : <StarOff className="w-5 h-5" />}
+                          {isFavoriteForUser(radio) ? <Star className="w-5 h-5" /> : <StarOff className="w-5 h-5" />}
                         </Button>
                         <div className="flex-1 min-w-0">
                           <h3 className="text-base font-semibold text-white truncate">{radio.nome}</h3>
