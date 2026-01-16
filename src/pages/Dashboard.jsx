@@ -453,7 +453,7 @@ const Dashboard = () => {
                       <select
                         value={formData.bitrate_kbps}
                         onChange={(e) => setFormData({ ...formData, bitrate_kbps: Number(e.target.value) })}
-                        className="w-full h-[42px] bg-slate-900/60 border border-slate-700 rounded-md pl-3 pr-6 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                        className="w-full min-w-[120px] h-[42px] bg-slate-900/60 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                       >
                         <option value={128}>128 kbps</option>
                         <option value={96}>96 kbps</option>
