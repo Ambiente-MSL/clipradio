@@ -1449,6 +1449,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
   const [filters, setFilters] = useState({ radioId: initialRadioId, data: '', cidade: '', estado: '' });
   const [currentPlayingId, setCurrentPlayingId] = useState(null);
   const [openTranscriptionId, setOpenTranscriptionId] = useState(null);
+  const autoTranscriptionStartedRef = useRef(new Set());
 
   useEffect(() => {
     const handleGlobalAudioClosed = () => setCurrentPlayingId(null);
@@ -1589,6 +1590,45 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
     fetchGravacoes();
 
   }, [fetchGravacoes]);
+
+  useEffect(() => {
+    if (!gravacoes || gravacoes.length === 0) return;
+    const now = new Date();
+    const startOfTodayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const candidates = gravacoes.filter((gravacao) => {
+      if (!gravacao?.id) return false;
+      if (autoTranscriptionStartedRef.current.has(gravacao.id)) return false;
+      if (String(gravacao.status || '').toLowerCase() !== 'concluido') return false;
+      const createdAtMs = new Date(gravacao.criado_em || 0).getTime();
+      if (!Number.isFinite(createdAtMs) || createdAtMs < startOfTodayMs) return false;
+      if (!gravacao.arquivo_url && !gravacao.arquivo_nome) return false;
+      const transStatus = String(gravacao.transcricao_status || '').toLowerCase();
+      if (transStatus) return false;
+      if (gravacao.transcricao_disponivel) return false;
+      if (gravacao.transcricao_cancelada) return false;
+      return true;
+    });
+    if (candidates.length === 0) return;
+
+    let cancelled = false;
+    const startTranscriptions = async () => {
+      for (const gravacao of candidates) {
+        if (cancelled) return;
+        autoTranscriptionStartedRef.current.add(gravacao.id);
+        try {
+          await apiClient.startTranscricao(gravacao.id, { force: false });
+        } catch (error) {
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Erro ao iniciar transcrição automática', error);
+          }
+        }
+      }
+    };
+    startTranscriptions();
+    return () => {
+      cancelled = true;
+    };
+  }, [gravacoes]);
 
   useEffect(() => {
     let timer;

@@ -136,6 +136,36 @@ def _resolve_audio_filepath(gravacao):
     return filepath
 
 
+def _cleanup_local_audio_after_transcription(gravacao):
+    if not gravacao:
+        return
+    try:
+        from services.dropbox_service import get_dropbox_config
+    except Exception:
+        return
+    try:
+        dropbox_cfg = get_dropbox_config()
+    except Exception:
+        return
+    if not dropbox_cfg.is_ready:
+        return
+    if not (dropbox_cfg.delete_local_after_upload and dropbox_cfg.local_retention_days <= 0):
+        return
+
+    filepath = _resolve_audio_filepath(gravacao)
+    if not filepath:
+        return
+    marker_path = f"{filepath}.dropbox"
+    if not os.path.exists(marker_path):
+        return
+    try:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        os.remove(marker_path)
+    except Exception:
+        pass
+
+
 def _load_model():
     global _MODEL
     if _MODEL is not None:
@@ -467,6 +497,7 @@ def transcribe_gravacao(gravacao_id, *, force=False):
         cancelada=False,
     )
     _persist_transcription_segments(gravacao.id, segments_payload)
+    _cleanup_local_audio_after_transcription(gravacao)
     return True
 
 

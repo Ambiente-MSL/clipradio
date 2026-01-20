@@ -164,7 +164,11 @@ def _finalizar_gravacao(gravacao, status, filepath=None, duration_seconds=None, 
                 remote_path = build_remote_audio_path(os.path.basename(filepath), base_path=dropbox_cfg.audio_path)
                 upload_file(filepath, remote_path, token=dropbox_cfg.access_token)
 
-                if dropbox_cfg.local_retention_days > 0:
+                should_delete_local = dropbox_cfg.delete_local_after_upload and dropbox_cfg.local_retention_days <= 0
+                if Config.TRANSCRIBE_ENABLED and gravacao.transcricao_status != 'concluido':
+                    should_delete_local = False
+
+                if not should_delete_local:
                     try:
                         marker_path = f"{filepath}.dropbox"
                         with open(marker_path, "w", encoding="utf-8") as fp:
@@ -172,9 +176,6 @@ def _finalizar_gravacao(gravacao, status, filepath=None, duration_seconds=None, 
                     except Exception:
                         pass
 
-                should_delete_local = dropbox_cfg.delete_local_after_upload and dropbox_cfg.local_retention_days <= 0
-                if Config.TRANSCRIBE_ENABLED and gravacao.transcricao_status != 'concluido':
-                    should_delete_local = False
                 if should_delete_local:
                     try:
                         os.remove(filepath)

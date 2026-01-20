@@ -1,5 +1,6 @@
 import json
 import os
+import posixpath
 from urllib.parse import unquote, urlparse
 from dataclasses import dataclass
 from typing import Generator, Optional, Tuple
@@ -143,6 +144,10 @@ def upload_file(
     if not local_path or not os.path.exists(local_path):
         raise DropboxError(f"Arquivo local não encontrado: {local_path}")
 
+    remote_dir = posixpath.dirname(remote_path or "")
+    if remote_dir and remote_dir != "/":
+        _ensure_folder(remote_dir, token=token)
+
     size = os.path.getsize(local_path)
     if size <= MAX_SIMPLE_UPLOAD_BYTES:
         return _upload_simple(local_path, remote_path, token=token, timeout=timeout)
@@ -270,3 +275,32 @@ def stream_download(
     for chunk in resp.iter_content(chunk_size=chunk_size):
         if chunk:
             yield chunk
+
+
+def _ensure_folder(path: str, *, token: str, timeout: Tuple[int, int] = (10, 30)) -> None:
+    normalized = str(path or "").strip()
+    if not normalized or normalized == "/":
+        return
+    if not normalized.startswith("/"):
+        normalized = f"/{normalized}"
+
+    resp = requests.post(
+        f"{DROPBOX_API_BASE}/files/create_folder_v2",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        json={"path": normalized, "autorename": False},
+        timeout=timeout,
+    )
+    if resp.ok:
+        return
+    if resp.status_code == 409:
+        try:
+            data = resp.json() or {}
+            summary = str(data.get("error_summary") or "")
+            if "conflict" in summary and "folder" in summary:
+                return
+        except Exception:
+            pass
+    _raise_for_response(resp, action="create_folder")
