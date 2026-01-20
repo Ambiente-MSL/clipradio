@@ -339,7 +339,7 @@ def start_recording(gravacao, *, duration_seconds=None, agendamento=None, block=
 
 
 def stop_recording(gravacao):
-    """Para grava??o em andamento manualmente."""
+    """Para gravação em andamento manualmente."""
     filepath = _get_audio_filepath(gravacao)
 
     proc = ACTIVE_PROCESSES.pop(gravacao.id, None)

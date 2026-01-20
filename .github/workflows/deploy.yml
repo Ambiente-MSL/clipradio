@@ -38,7 +38,7 @@ jobs:
               mkdir -p "${DEPLOY_PATH}"
             fi
             cd "${DEPLOY_PATH}"
-            # Se ainda n?o for um reposit?rio git, fazer clone
+            # Se ainda não for um repositório git, fazer clone
             if [ ! -d ".git" ]; then
               git clone "${REPO_SSH_URL}" .
             fi

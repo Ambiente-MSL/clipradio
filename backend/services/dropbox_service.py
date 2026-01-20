@@ -1,5 +1,6 @@
 import json
 import os
+from urllib.parse import unquote, urlparse
 from dataclasses import dataclass
 from typing import Generator, Optional, Tuple
 
@@ -38,6 +39,32 @@ def _as_bool(value, default: bool = False) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+def _normalize_dropbox_audio_path(value: Optional[str]) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return "/clipradio/audio"
+    if raw.startswith(("http://", "https://")):
+        try:
+            parsed = urlparse(raw)
+            if "dropbox.com" in (parsed.netloc or ""):
+                path = parsed.path or ""
+                if path.startswith("/work/"):
+                    path = path[len("/work/"):]
+                elif path.startswith("/home/"):
+                    path = path[len("/home/"):]
+                else:
+                    path = path.lstrip("/")
+                path = unquote(path)
+                if path:
+                    raw = path
+        except Exception:
+            pass
+    raw = raw.strip().rstrip("/")
+    if not raw.startswith("/"):
+        raw = f"/{raw}"
+    return raw or "/clipradio/audio"
+
+
 def get_dropbox_config() -> DropboxConfig:
     """
     Lê configuração do Dropbox a partir do Flask app (se disponível) ou variáveis de ambiente.
@@ -64,9 +91,7 @@ def get_dropbox_config() -> DropboxConfig:
     except Exception:
         local_retention_days = 0
 
-    audio_path = str(audio_path or "/clipradio/audio").strip()
-    if not audio_path.startswith("/"):
-        audio_path = f"/{audio_path}"
+    audio_path = _normalize_dropbox_audio_path(audio_path)
 
     return DropboxConfig(
         enabled=enabled,
