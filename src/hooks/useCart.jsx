@@ -27,7 +27,7 @@ export const CartProvider = ({ children }) => {
         const existingItem = cartItems.find(item => item.variant.id === variant.id);
         const currentCartQuantity = existingItem ? existingItem.quantity : 0;
         if ((currentCartQuantity + quantity) > availableQuantity) {
-          const error = new Error(`Not enough stock for ${product.title} (${variant.title}). Only ${availableQuantity} left.`);
+          const error = new Error(`Estoque insuficiente para ${product.title} (${variant.title}). Apenas ${availableQuantity} em estoque.`);
           reject(error);
           return;
         }

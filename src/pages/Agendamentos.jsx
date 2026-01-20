@@ -159,10 +159,10 @@ const Agendamentos = () => {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-      toast({ title: `Relat?rio ${format.toUpperCase()} gerado`, description: 'Download iniciado.' });
+      toast({ title: `Relatório ${format.toUpperCase()} gerado`, description: 'Download iniciado.' });
       return true;
     } catch (error) {
-      toast({ title: 'Erro ao gerar relat?rio', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao gerar relatório', description: error.message, variant: 'destructive' });
       return false;
     } finally {
       setExportingFormat(null);
@@ -172,11 +172,11 @@ const Agendamentos = () => {
   const handleConfirmReport = async () => {
     if (!reportFormat) return;
     if (!reportStartDate || !reportEndDate) {
-      toast({ title: 'Selecione o periodo', description: 'Informe data inicial e final.', variant: 'destructive' });
+      toast({ title: 'Selecione o período', description: 'Informe a data inicial e final.', variant: 'destructive' });
       return;
     }
     if (reportStartDate > reportEndDate) {
-      toast({ title: 'Periodo invalido', description: 'A data inicial deve ser anterior ou igual a data final.', variant: 'destructive' });
+      toast({ title: 'Período inválido', description: 'A data inicial deve ser anterior ou igual à data final.', variant: 'destructive' });
       return;
     }
     const success = await handleExport(reportFormat, { startDate: reportStartDate, endDate: reportEndDate });
@@ -294,7 +294,7 @@ const Agendamentos = () => {
       <Dialog open={isReportModalOpen} onOpenChange={setIsReportModalOpen}>
         <DialogContent className="sm:max-w-[420px] bg-slate-900 border-slate-700 text-white">
           <DialogHeader>
-            <DialogTitle>Periodo do relatorio {reportFormat ? reportFormat.toUpperCase() : ''}</DialogTitle>
+            <DialogTitle>Período do relatório {reportFormat ? reportFormat.toUpperCase() : ''}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="space-y-2">
@@ -328,7 +328,7 @@ const Agendamentos = () => {
               Cancelar
             </Button>
             <Button onClick={handleConfirmReport} disabled={exportingFormat !== null}>
-              {exportingFormat ? 'Gerando...' : `Gerar ${reportFormat ? reportFormat.toUpperCase() : 'relatorio'}`}
+              {exportingFormat ? 'Gerando...' : `Gerar ${reportFormat ? reportFormat.toUpperCase() : 'relatório'}`}
             </Button>
           </DialogFooter>
         </DialogContent>

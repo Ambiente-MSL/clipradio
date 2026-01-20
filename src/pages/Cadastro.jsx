@@ -25,7 +25,7 @@ const Cadastro = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const nome = (email.split('@')[0] || 'Usuario').slice(0, 255);
+    const nome = (email.split('@')[0] || 'Usuário').slice(0, 255);
 
     const { error } = await signUp(email, password, nome);
 

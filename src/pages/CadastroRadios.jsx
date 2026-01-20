@@ -341,7 +341,7 @@ const CadastroRadios = () => {
 
     const plannedDuration = computeDurationMinutes()
     if (!plannedDuration || plannedDuration <= 0) {
-      toast({ title: 'Horario invalido', description: 'Defina hora de inicio e fim validas.', variant: 'destructive' })
+      toast({ title: 'Horário inválido', description: 'Defina hora de início e fim válidas.', variant: 'destructive' })
       return
     }
 

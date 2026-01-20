@@ -17,8 +17,8 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   const handleCheckout = useCallback(async () => {
     if (cartItems.length === 0) {
       toast({
-        title: 'Your cart is empty',
-        description: 'Add some products to your cart before checking out.',
+        title: 'Seu carrinho está vazio',
+        description: 'Adicione alguns produtos ao carrinho antes de finalizar.',
         variant: 'destructive',
       });
       return;
@@ -39,8 +39,8 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
       window.location.href = url;
     } catch (error) {
       toast({
-        title: 'Checkout Error',
-        description: 'There was a problem initializing checkout. Please try again.',
+        title: 'Erro no checkout',
+        description: 'Houve um problema ao iniciar o checkout. Tente novamente.',
         variant: 'destructive',
       });
     }
@@ -65,7 +65,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-6 border-b border-white/10">
-              <h2 className="text-2xl font-bold text-white">Shopping Cart</h2>
+              <h2 className="text-2xl font-bold text-white">Carrinho de compras</h2>
               <Button onClick={() => setIsCartOpen(false)} variant="ghost" size="icon" className="text-white hover:bg-white/10">
                 <X />
               </Button>
@@ -74,7 +74,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
               {cartItems.length === 0 ? (
                 <div className="text-center text-gray-400 h-full flex flex-col items-center justify-center">
                   <ShoppingCartIcon size={48} className="mb-4" />
-                  <p>Your cart is empty.</p>
+                  <p>Seu carrinho está vazio.</p>
                 </div>
               ) : (
                 cartItems.map(item => (
@@ -93,7 +93,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                         <span className="px-2 text-white">{item.quantity}</span>
                         <Button onClick={() => updateQuantity(item.variant.id, item.quantity + 1)} size="sm" variant="ghost" className="px-2 text-white hover:bg-white/10">+</Button>
                       </div>
-                      <Button onClick={() => removeFromCart(item.variant.id)} size="sm" variant="ghost" className="text-red-400 hover:text-red-300 text-xs">Remove</Button>
+                      <Button onClick={() => removeFromCart(item.variant.id)} size="sm" variant="ghost" className="text-red-400 hover:text-red-300 text-xs">Remover</Button>
                     </div>
                   </div>
                 ))
@@ -106,7 +106,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                   <span className="text-2xl font-bold">${(getCartTotal() / 100).toFixed(2)}</span>
                 </div>
                 <Button onClick={handleCheckout} className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 text-base">
-                  Proceed to Checkout
+                  Finalizar compra
                 </Button>
               </div>
             )}

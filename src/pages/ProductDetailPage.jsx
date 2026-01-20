@@ -28,13 +28,13 @@ function ProductDetailPage() {
       try {
         await addToCart(product, selectedVariant, quantity, availableQuantity);
         toast({
-          title: "Added to Cart! 🛒",
-          description: `${quantity} x ${product.title} (${selectedVariant.title}) added.`,
+          title: "Adicionado ao carrinho! 🛒",
+          description: `${quantity} x ${product.title} (${selectedVariant.title}) adicionado ao seu carrinho.`,
         });
       } catch (error) {
         toast({
           variant: "destructive",
-          title: "Oh no! Something went wrong.",
+          title: "Ops! Algo deu errado.",
           description: error.message,
         });
       }
@@ -108,7 +108,7 @@ function ProductDetailPage() {
           throw quantityError;
         }
       } catch (err) {
-        setError(err.message || 'Failed to load product');
+        setError(err.message || 'Falha ao carregar produto');
       } finally {
         setLoading(false);
       }
@@ -130,11 +130,11 @@ function ProductDetailPage() {
       <div className="max-w-5xl mx-auto">
         <Link to="/" className="inline-flex items-center gap-2 text-white hover:text-purple-300 transition-colors mb-6">
           <ArrowLeft size={16} />
-          Go back
+          Voltar
         </Link>
         <div className="text-center text-red-400 p-8 glass-card rounded-2xl">
           <XCircle className="mx-auto h-16 w-16 mb-4" />
-          <p className="mb-6">Error loading product: {error}</p>
+          <p className="mb-6">Erro ao carregar produto: {error}</p>
         </div>
       </div>
     );
@@ -152,13 +152,13 @@ function ProductDetailPage() {
   return (
     <>
       <Helmet>
-        <title>{product.title} - Our Store</title>
+        <title>{product.title} - Nossa loja</title>
         <meta name="description" content={product.description?.substring(0, 160) || product.title} />
       </Helmet>
       <div className="max-w-5xl mx-auto">
         <Link to="/store" className="inline-flex items-center gap-2 text-white hover:text-purple-300 transition-colors mb-6">
           <ArrowLeft size={16} />
-          Back to Store
+          Voltar para a loja
         </Link>
         <div className="grid md:grid-cols-2 gap-8 glass-card p-8 rounded-2xl">
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }} className="relative">
@@ -174,14 +174,14 @@ function ProductDetailPage() {
                   <button
                     onClick={handlePrevImage}
                     className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
-                    aria-label="Previous image"
+                    aria-label="Imagem anterior"
                   >
                     <ChevronLeft size={20} />
                   </button>
                   <button
                     onClick={handleNextImage}
                     className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
-                    aria-label="Next image"
+                    aria-label="Próxima imagem"
                   >
                     <ChevronRight size={20} />
                   </button>
@@ -204,7 +204,7 @@ function ProductDetailPage() {
                     className={`w-3 h-3 rounded-full transition-colors ${
                       index === currentImageIndex ? 'bg-purple-500' : 'bg-white/30 hover:bg-white/50'
                     }`}
-                    aria-label={`Go to image ${index + 1}`}
+                    aria-label={`Ir para a imagem ${index + 1}`}
                   />
                 ))}
               </div>
@@ -259,7 +259,7 @@ function ProductDetailPage() {
 
             {product.variants.length > 1 && (
               <div className="mb-6">
-                <h3 className="text-sm font-medium text-white mb-2">Style</h3>
+                <h3 className="text-sm font-medium text-white mb-2">Estilo</h3>
                 <div className="flex flex-wrap gap-2">
                   {product.variants.map(variant => (
                     <Button
@@ -285,24 +285,24 @@ function ProductDetailPage() {
 
             <div className="mt-auto">
               <Button onClick={handleAddToCart} size="lg" className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled={!canAddToCart || !product.purchasable}>
-                <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
+                <ShoppingCart className="mr-2 h-5 w-5" /> Adicionar ao carrinho
               </Button>
 
               {isStockManaged && canAddToCart && product.purchasable && (
                 <p className="text-sm text-green-400 mt-3 flex items-center justify-center gap-2">
-                  <CheckCircle size={16} /> {availableStock} in stock!
+                  <CheckCircle size={16} /> {availableStock} em estoque!
                 </p>
               )}
 
               {isStockManaged && !canAddToCart && product.purchasable && (
                  <p className="text-sm text-yellow-400 mt-3 flex items-center justify-center gap-2">
-                  <XCircle size={16} /> Not enough stock. Only {availableStock} left.
+                  <XCircle size={16} /> Estoque insuficiente. Apenas {availableStock} em estoque.
                 </p>
               )}
 
               {!product.purchasable && (
                   <p className="text-sm text-red-400 mt-3 flex items-center justify-center gap-2">
-                    <XCircle size={16} /> Currently unavailable
+                    <XCircle size={16} /> Indisponível no momento
                   </p>
               )}
             </div>

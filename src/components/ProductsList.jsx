@@ -33,12 +33,12 @@ const ProductCard = ({ product, index }) => {
     try {
       await addToCart(product, defaultVariant, 1, defaultVariant.inventory_quantity);
       toast({
-        title: "Added to Cart! 🛒",
-        description: `${product.title} has been added to your cart.`,
+        title: "Adicionado ao carrinho! 🛒",
+        description: `${product.title} foi adicionado ao seu carrinho.`,
       });
     } catch (error) {
       toast({
-        title: "Error adding to cart",
+        title: "Erro ao adicionar ao carrinho",
         description: error.message,
       });
     }
@@ -73,9 +73,9 @@ const ProductCard = ({ product, index }) => {
           </div>
           <div className="p-4">
             <h3 className="text-lg font-bold truncate">{product.title}</h3>
-            <p className="text-sm text-gray-300 h-10 overflow-hidden">{product.subtitle || 'Check out this amazing product!'}</p>
+            <p className="text-sm text-gray-300 h-10 overflow-hidden">{product.subtitle || 'Confira este produto incrível!'}</p>
             <Button onClick={handleAddToCart} className="w-full mt-4 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold">
-              <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
+              <ShoppingCart className="mr-2 h-4 w-4" /> Adicionar ao carrinho
             </Button>
           </div>
         </div>
@@ -124,7 +124,7 @@ const ProductsList = () => {
 
         setProducts(productsWithQuantities);
       } catch (err) {
-        setError(err.message || 'Failed to load products');
+        setError(err.message || 'Falha ao carregar produtos');
       } finally {
         setLoading(false);
       }
@@ -144,7 +144,7 @@ const ProductsList = () => {
   if (error) {
     return (
       <div className="text-center text-red-400 p-8">
-        <p>Error loading products: {error}</p>
+        <p>Erro ao carregar produtos: {error}</p>
       </div>
     );
   }
@@ -152,7 +152,7 @@ const ProductsList = () => {
   if (products.length === 0) {
     return (
       <div className="text-center text-gray-400 p-8">
-        <p>No products available at the moment.</p>
+        <p>Nenhum produto disponível no momento.</p>
       </div>
     );
   }

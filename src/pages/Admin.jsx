@@ -140,15 +140,15 @@ const Admin = () => {
     try {
       if (editingUserId) {
         await apiClient.updateAdminUser(editingUserId, payload);
-        toast({ title: 'Usuario atualizado' });
+        toast({ title: 'Usuário atualizado' });
       } else {
         await apiClient.createAdminUser(payload);
-        toast({ title: 'Usuario criado' });
+        toast({ title: 'Usuário criado' });
       }
       resetUserForm();
       fetchData();
     } catch (error) {
-      toast({ title: 'Erro ao salvar usuario', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao salvar usuário', description: error.message, variant: 'destructive' });
     } finally {
       setSavingUser(false);
     }
@@ -207,13 +207,13 @@ const Admin = () => {
   };
 
   const handleDeleteUser = async (userId) => {
-    if (!window.confirm('Excluir este usuario?')) return;
+    if (!window.confirm('Excluir este usuário?')) return;
     try {
       await apiClient.deleteAdminUser(userId);
-      toast({ title: 'Usuario excluido' });
+      toast({ title: 'Usuário excluído' });
       fetchData();
     } catch (error) {
-      toast({ title: 'Erro ao excluir usuario', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao excluir usuário', description: error.message, variant: 'destructive' });
     }
   };
 
@@ -221,7 +221,7 @@ const Admin = () => {
     if (!window.confirm('Excluir este cliente?')) return;
     try {
       await apiClient.deleteAdminClient(clientId);
-      toast({ title: 'Cliente excluido' });
+      toast({ title: 'Cliente excluído' });
       fetchData();
     } catch (error) {
       toast({ title: 'Erro ao excluir cliente', description: error.message, variant: 'destructive' });
@@ -250,7 +250,7 @@ const Admin = () => {
           <div>
             <p className="text-sm text-slate-400 uppercase tracking-[0.2em]">Admin</p>
             <h1 className="text-3xl md:text-4xl font-bold text-white mt-1">Painel administrativo</h1>
-            <p className="text-slate-400 mt-1">Gerencie clientes e usuarios do sistema.</p>
+            <p className="text-slate-400 mt-1">Gerencie clientes e usuários do sistema.</p>
           </div>
           <Button variant="outline" onClick={fetchData} className="border-slate-700 text-slate-100 hover:border-cyan-400">
             <RefreshCw className="w-4 h-4 mr-2" />
@@ -355,7 +355,7 @@ const Admin = () => {
               <Users className="w-5 h-5 text-cyan-300" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-white">Usuarios</h2>
+              <h2 className="text-xl font-semibold text-white">Usuários</h2>
               <p className="text-sm text-slate-400">Controle de acesso por cliente e permissao admin.</p>
             </div>
           </div>
@@ -379,7 +379,7 @@ const Admin = () => {
                 name="nome"
                 value={userForm.nome}
                 onChange={(event) => setUserForm((prev) => ({ ...prev, nome: event.target.value }))}
-                placeholder="Nome do usuario"
+                placeholder="Nome do usuário"
               />
             </div>
             <div className="space-y-2">
@@ -427,12 +427,12 @@ const Admin = () => {
                 checked={userForm.ativo}
                 onCheckedChange={(value) => setUserForm((prev) => ({ ...prev, ativo: Boolean(value) }))}
               />
-              <span className="text-sm text-slate-300">Usuario ativo</span>
+              <span className="text-sm text-slate-300">Usuário ativo</span>
             </div>
             <div className="flex items-center gap-2 md:col-span-2 xl:col-span-4">
               <Button type="submit" disabled={savingUser}>
                 <UserPlus className="w-4 h-4 mr-2" />
-                {editingUserId ? 'Salvar usuario' : 'Adicionar usuario'}
+                {editingUserId ? 'Salvar usuário' : 'Adicionar usuário'}
               </Button>
               {editingUserId && (
                 <Button type="button" variant="ghost" onClick={resetUserForm}>
@@ -444,7 +444,7 @@ const Admin = () => {
 
           <div className="space-y-3">
             {users.length === 0 ? (
-              <div className="text-sm text-slate-400">Nenhum usuario cadastrado.</div>
+              <div className="text-sm text-slate-400">Nenhum usuário cadastrado.</div>
             ) : (
               users.map((u) => (
                 <div key={u.id} className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg border border-slate-800 bg-slate-900/50">
@@ -461,7 +461,7 @@ const Admin = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-xs px-2 py-1 rounded-full border ${u.is_admin ? 'border-cyan-400 text-cyan-300' : 'border-slate-600 text-slate-300'}`}>
-                      {u.is_admin ? 'Admin' : 'Usuario'}
+                      {u.is_admin ? 'Admin' : 'Usuário'}
                     </span>
                     <span className={`text-xs px-2 py-1 rounded-full border ${u.ativo ? 'border-emerald-400 text-emerald-300' : 'border-red-400 text-red-300'}`}>
                       {u.ativo ? 'Ativo' : 'Inativo'}

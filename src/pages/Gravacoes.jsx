@@ -2068,7 +2068,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
                           <div className="flex items-center gap-2 text-xs text-slate-400">
 
-                            <span>Iniciada em {format(new Date(gravacao.criado_em), "d MMM '??s' HH:mm", { locale: ptBR })}</span>
+                            <span>Iniciada em {format(new Date(gravacao.criado_em), "d MMM 'às' HH:mm", { locale: ptBR })}</span>
 
                             <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-200 uppercase tracking-wide">
 
