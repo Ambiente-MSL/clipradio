@@ -19,7 +19,10 @@ def get_audio(filename):
 
     # Fallback: buscar no Dropbox quando o arquivo local foi arquivado/deletado
     try:
-        from services.dropbox_service import build_candidate_audio_paths, download_response, get_dropbox_config
+        from app import db
+        from models.gravacao import Gravacao
+        from models.radio import Radio
+        from services.dropbox_service import build_audio_destination, build_candidate_audio_paths, download_response, get_dropbox_config
 
         dropbox_cfg = get_dropbox_config()
         if not dropbox_cfg.is_ready:
@@ -27,7 +30,33 @@ def get_audio(filename):
 
         range_header = request.headers.get('Range')
         resp = None
-        candidates = build_candidate_audio_paths(filename, base_path=dropbox_cfg.audio_path)
+        candidates = []
+
+        if dropbox_cfg.audio_layout == "hierarchy":
+            gravacao = Gravacao.query.filter(Gravacao.arquivo_nome == filename).first()
+            if not gravacao:
+                gravacao = Gravacao.query.filter(Gravacao.arquivo_url.like(f"%/{filename}")).first()
+            if gravacao:
+                radio_obj = gravacao.radio or Radio.query.get(gravacao.radio_id)
+                try:
+                    remote_path, _ = build_audio_destination(
+                        gravacao,
+                        radio=radio_obj,
+                        original_filename=filename,
+                        base_path=dropbox_cfg.audio_path,
+                        layout=dropbox_cfg.audio_layout,
+                    )
+                    candidates.append(remote_path)
+                except Exception:
+                    pass
+
+            candidates.extend(build_candidate_audio_paths(filename, base_path=dropbox_cfg.audio_path, layout="date"))
+            candidates.extend(build_candidate_audio_paths(filename, base_path=dropbox_cfg.audio_path, layout="flat"))
+        else:
+            candidates.extend(build_candidate_audio_paths(filename, base_path=dropbox_cfg.audio_path))
+
+        seen = set()
+        candidates = [path for path in candidates if not (path in seen or seen.add(path))]
         for remote_path in candidates:
             resp = download_response(remote_path, token=dropbox_cfg.access_token, range_header=range_header)
             if resp.status_code in (404, 409):

@@ -140,7 +140,7 @@ def _cleanup_local_audio_after_transcription(gravacao):
     if not gravacao:
         return
     try:
-        from services.dropbox_service import get_dropbox_config
+        from services.dropbox_service import build_audio_destination, get_dropbox_config
     except Exception:
         return
     try:
@@ -149,6 +149,25 @@ def _cleanup_local_audio_after_transcription(gravacao):
         return
     if not dropbox_cfg.is_ready:
         return
+    if dropbox_cfg.audio_layout == "hierarchy":
+        try:
+            radio_obj = getattr(gravacao, "radio", None)
+            remote_path, remote_name = build_audio_destination(
+                gravacao,
+                radio=radio_obj,
+                original_filename=gravacao.arquivo_nome or gravacao.arquivo_url,
+                base_path=dropbox_cfg.audio_path,
+            )
+            if remote_name and gravacao.arquivo_nome != remote_name:
+                gravacao.arquivo_nome = remote_name
+                gravacao.arquivo_url = f"/api/files/audio/{remote_name}"
+                try:
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+        except Exception:
+            pass
+
     if not (dropbox_cfg.delete_local_after_upload and dropbox_cfg.local_retention_days <= 0):
         return
 

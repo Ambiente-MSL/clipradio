@@ -219,11 +219,22 @@ def _finalizar_gravacao(gravacao, status, filepath=None, duration_seconds=None, 
     # Arquivar para Dropbox (opcional). Mantém URLs iguais (/api/files/audio/<arquivo>)
     try:
         if status == 'concluido':
-            from services.dropbox_service import build_remote_audio_path, get_dropbox_config, upload_file
+            from services.dropbox_service import build_audio_destination, get_dropbox_config, upload_file
 
             dropbox_cfg = get_dropbox_config()
             if dropbox_cfg.is_ready and filepath and os.path.exists(filepath):
-                remote_path = build_remote_audio_path(os.path.basename(filepath), base_path=dropbox_cfg.audio_path)
+                radio_obj = None
+                try:
+                    radio_obj = Radio.query.get(gravacao.radio_id)
+                except Exception:
+                    radio_obj = None
+
+                remote_path, remote_name = build_audio_destination(
+                    gravacao,
+                    radio=radio_obj,
+                    original_filename=os.path.basename(filepath),
+                    base_path=dropbox_cfg.audio_path,
+                )
                 upload_file(filepath, remote_path, token=dropbox_cfg.access_token)
 
                 should_delete_local = dropbox_cfg.delete_local_after_upload and dropbox_cfg.local_retention_days <= 0
@@ -237,6 +248,16 @@ def _finalizar_gravacao(gravacao, status, filepath=None, duration_seconds=None, 
                             fp.write(remote_path)
                     except Exception:
                         pass
+
+                if dropbox_cfg.audio_layout == "hierarchy" and remote_name:
+                    can_update_db = not (Config.TRANSCRIBE_ENABLED and gravacao.transcricao_status != 'concluido')
+                    if can_update_db and gravacao.arquivo_nome != remote_name:
+                        gravacao.arquivo_nome = remote_name
+                        gravacao.arquivo_url = f"/api/files/audio/{remote_name}"
+                        try:
+                            db.session.commit()
+                        except Exception:
+                            db.session.rollback()
 
                 if should_delete_local:
                     try:

@@ -2,7 +2,9 @@ import json
 import os
 import posixpath
 import re
+import unicodedata
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from urllib.parse import unquote, urlparse
 from dataclasses import dataclass
 from typing import Generator, Optional, Tuple
@@ -15,6 +17,7 @@ DROPBOX_CONTENT_BASE = "https://content.dropboxapi.com/2"
 
 MAX_SIMPLE_UPLOAD_BYTES = 150 * 1024 * 1024  # 150MB (limite do /files/upload)
 DEFAULT_CHUNK_SIZE = 8 * 1024 * 1024  # 8MB
+LOCAL_TZ = ZoneInfo("America/Fortaleza")
 
 
 @dataclass(frozen=True)
@@ -45,7 +48,7 @@ def _as_bool(value, default: bool = False) -> bool:
 
 def _normalize_layout(value: Optional[str]) -> str:
     layout = str(value or "").strip().lower()
-    if layout in {"date", "flat"}:
+    if layout in {"date", "flat", "hierarchy"}:
         return layout
     return "flat"
 
@@ -77,6 +80,131 @@ def _normalize_dropbox_audio_path(value: Optional[str]) -> str:
 
 
 _AUDIO_DATE_RE = re.compile(r"(\\d{8})_(\\d{6})")
+_AUDIO_ID_RE = re.compile(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", re.I)
+
+
+def _slugify_segment(value: Optional[str], *, fallback: str, max_length: int = 80) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return fallback
+    normalized = unicodedata.normalize("NFKD", raw)
+    ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+    ascii_text = ascii_text.strip()
+    ascii_text = re.sub(r"[^A-Za-z0-9]+", "_", ascii_text)
+    ascii_text = ascii_text.strip("_").upper()
+    if not ascii_text:
+        return fallback
+    return ascii_text[:max_length]
+
+
+def get_audio_id_from_filename(filename: str) -> Optional[str]:
+    name = os.path.basename(str(filename or ""))
+    match = _AUDIO_ID_RE.search(name)
+    if not match:
+        return None
+    return match.group(1)
+
+
+def _get_audio_timestamp_parts(filename: Optional[str], fallback_dt: Optional[datetime]) -> Tuple[str, str]:
+    date_part = None
+    time_part = None
+    name = os.path.basename(str(filename or ""))
+    match = _AUDIO_DATE_RE.search(name)
+    if match:
+        date_part = match.group(1)
+        time_part = match.group(2)
+    if date_part and time_part:
+        return date_part, time_part
+
+    dt = fallback_dt or datetime.now(tz=LOCAL_TZ)
+    if dt.tzinfo:
+        dt = dt.astimezone(LOCAL_TZ)
+    else:
+        dt = dt.replace(tzinfo=LOCAL_TZ)
+    return dt.strftime("%Y%m%d"), dt.strftime("%H%M%S")
+
+
+def build_audio_filename(
+    gravacao,
+    *,
+    radio=None,
+    original_filename: Optional[str] = None,
+    fallback_ext: str = ".mp3",
+) -> str:
+    radio_name = getattr(radio, "nome", None)
+    if radio_name is None and getattr(gravacao, "radio", None):
+        radio_name = getattr(gravacao.radio, "nome", None)
+    radio_slug = _slugify_segment(radio_name, fallback="RADIO", max_length=80)
+
+    date_part, time_part = _get_audio_timestamp_parts(
+        original_filename,
+        getattr(gravacao, "criado_em", None),
+    )
+    _, ext = os.path.splitext(str(original_filename or ""))
+    ext = ext.lower() if ext else fallback_ext
+
+    gravacao_id = getattr(gravacao, "id", None) or "SEM_ID"
+    return f"{radio_slug}_{date_part}_{time_part}_{gravacao_id}{ext}"
+
+
+def build_audio_folder_path(
+    gravacao,
+    *,
+    radio=None,
+    original_filename: Optional[str] = None,
+    base_path: Optional[str] = None,
+) -> str:
+    cfg = get_dropbox_config()
+    root = (base_path or cfg.audio_path or "/clipradio/audio").rstrip("/")
+
+    radio_obj = radio or getattr(gravacao, "radio", None)
+    radio_name = getattr(radio_obj, "nome", None)
+    city_name = getattr(radio_obj, "cidade", None)
+    uf_value = getattr(radio_obj, "estado", None)
+
+    date_part, _ = _get_audio_timestamp_parts(
+        original_filename,
+        getattr(gravacao, "criado_em", None),
+    )
+    year = date_part[:4]
+    month = date_part[4:6]
+
+    uf = str(uf_value or "").strip().upper()
+    uf = re.sub(r"[^A-Z]", "", uf)
+    uf = uf if len(uf) == 2 else _slugify_segment(uf, fallback="UF", max_length=8)
+
+    city = _slugify_segment(city_name, fallback="SEM_CIDADE", max_length=80)
+    radio_slug = _slugify_segment(radio_name, fallback="RADIO", max_length=80)
+
+    return posixpath.join(root, year, month, uf, city, radio_slug, "ARQUIVOS")
+
+
+def build_audio_destination(
+    gravacao,
+    *,
+    radio=None,
+    original_filename: Optional[str] = None,
+    base_path: Optional[str] = None,
+    layout: Optional[str] = None,
+) -> Tuple[str, str]:
+    cfg = get_dropbox_config()
+    layout = _normalize_layout(layout or cfg.audio_layout)
+
+    filename = str(original_filename or getattr(gravacao, "arquivo_nome", "") or "")
+    if layout != "hierarchy":
+        return (
+            build_remote_audio_path(filename, base_path=base_path, layout=layout),
+            filename.lstrip("/"),
+        )
+
+    desired_name = build_audio_filename(gravacao, radio=radio, original_filename=filename)
+    folder_path = build_audio_folder_path(
+        gravacao,
+        radio=radio,
+        original_filename=filename,
+        base_path=base_path,
+    )
+    return posixpath.join(folder_path, desired_name), desired_name
 
 
 def get_audio_date_path(filename: str) -> Optional[str]:
@@ -146,6 +274,8 @@ def build_remote_audio_path(
         date_path = get_audio_date_path(name)
         if date_path:
             return posixpath.join(root, date_path, name)
+    if layout == "hierarchy":
+        return posixpath.join(root, name)
     return posixpath.join(root, name)
 
 
@@ -165,6 +295,8 @@ def build_candidate_audio_paths(
         date_path = get_audio_date_path(name)
         if date_path:
             candidates.append(posixpath.join(root, date_path, name))
+        candidates.append(posixpath.join(root, name))
+    elif layout == "hierarchy":
         candidates.append(posixpath.join(root, name))
     else:
         candidates.append(posixpath.join(root, name))
@@ -437,3 +569,11 @@ def _ensure_folder(path: str, *, token: str, timeout: Tuple[int, int] = (10, 30)
             except Exception:
                 pass
         _raise_for_response(resp, action="create_folder")
+
+
+def ensure_folder(path: str, *, token: Optional[str] = None) -> None:
+    cfg = get_dropbox_config()
+    token = token or cfg.access_token
+    if not token:
+        raise DropboxError("DROPBOX_ACCESS_TOKEN nǜo configurado")
+    _ensure_folder(path, token=token)
