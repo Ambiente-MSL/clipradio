@@ -52,17 +52,9 @@ const CadastroRadios = () => {
   const { toast } = useToast()
   const { user } = useAuth()
   const ITEMS_PER_PAGE = 10
-  const isFavoriteForUser = useCallback(
-    (radio) => {
-      if (!radio?.favorita) return false
-      if (!user?.id) return true
-      return radio.user_id === user.id
-    },
-    [user?.id],
-  )
   const filteredRadios = useMemo(
-    () => (showFavoritesOnly ? radios.filter(isFavoriteForUser) : radios),
-    [radios, showFavoritesOnly, isFavoriteForUser],
+    () => (showFavoritesOnly ? radios.filter((radio) => radio.favorita) : radios),
+    [radios, showFavoritesOnly],
   )
   const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredRadios.length / ITEMS_PER_PAGE)), [filteredRadios.length])
   const paginatedRadios = useMemo(() => {
@@ -75,8 +67,6 @@ const CadastroRadios = () => {
   useEffect(() => {
     setRadiosPage((prev) => Math.min(prev, totalPages))
   }, [totalPages])
-
-  const canManageRadio = (radio) => user?.is_admin || radio?.user_id === user?.id
 
   const resetForm = useCallback(() => {
     setFormData({ nome: '', stream_url: '', cidade: '', estado: '', favorita: false, bitrate_kbps: 128, output_format: 'mp3', audio_mode: 'stereo' })
@@ -635,14 +625,25 @@ const CadastroRadios = () => {
                               variant="ghost"
                               size="icon"
                               onClick={() => toggleFavorite(radio)}
-                              disabled={!canManageRadio(radio)}
                               className="h-8 w-8 flex-shrink-0 hover:bg-yellow-500/10 transition-colors"
+                              aria-pressed={radio.favorita}
                             >
-                              {isFavoriteForUser(radio) ? (
-                                <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                              ) : (
-                                <StarOff className="w-4 h-4 text-slate-500 group-hover:text-yellow-400/50 transition-colors" />
-                              )}
+                              <motion.span
+                                initial={false}
+                                animate={
+                                  radio.favorita
+                                    ? { scale: [1, 1.25, 1], rotate: [0, 12, 0] }
+                                    : { scale: [1, 0.9, 1], rotate: [0, -10, 0] }
+                                }
+                                transition={{ duration: 0.35, ease: 'easeOut' }}
+                                className="inline-flex"
+                              >
+                                {radio.favorita ? (
+                                  <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                                ) : (
+                                  <StarOff className="w-4 h-4 text-slate-500 group-hover:text-yellow-400/50 transition-colors" />
+                                )}
+                              </motion.span>
                             </Button>
                           </div>
                         </div>
@@ -729,7 +730,6 @@ const CadastroRadios = () => {
                               size="sm"
                               variant="ghost"
                               onClick={() => handleEdit(radio)}
-                              disabled={!canManageRadio(radio)}
                               className="flex-1 h-8 text-xs text-slate-400 hover:text-white hover:bg-slate-800/60"
                             >
                               <Edit className="w-3 h-3 mr-1" />
@@ -739,7 +739,6 @@ const CadastroRadios = () => {
                               size="sm"
                               variant="ghost"
                               onClick={() => openDeleteDialog(radio)}
-                              disabled={!canManageRadio(radio)}
                               className="flex-1 h-8 text-xs text-slate-400 hover:text-red-400 hover:bg-red-500/10"
                             >
                               <Trash2 className="w-3 h-3 mr-1" />
@@ -762,10 +761,21 @@ const CadastroRadios = () => {
                           variant="ghost"
                           size="icon"
                           onClick={() => toggleFavorite(radio)}
-                          disabled={!canManageRadio(radio)}
                           className="text-yellow-400 flex-shrink-0"
+                          aria-pressed={radio.favorita}
                         >
-                          {isFavoriteForUser(radio) ? <Star className="w-5 h-5" /> : <StarOff className="w-5 h-5" />}
+                          <motion.span
+                            initial={false}
+                            animate={
+                              radio.favorita
+                                ? { scale: [1, 1.25, 1], rotate: [0, 12, 0] }
+                                : { scale: [1, 0.9, 1], rotate: [0, -10, 0] }
+                            }
+                            transition={{ duration: 0.35, ease: 'easeOut' }}
+                            className="inline-flex"
+                          >
+                            {radio.favorita ? <Star className="w-5 h-5" /> : <StarOff className="w-5 h-5" />}
+                          </motion.span>
                         </Button>
                         <div className="flex-1 min-w-0">
                           <h3 className="text-base font-semibold text-white truncate">{radio.nome}</h3>
@@ -813,7 +823,7 @@ const CadastroRadios = () => {
                               </Button>
                             )
                           })()}
-                          <Button size="sm" variant="outline" onClick={() => handleEdit(radio)} disabled={!canManageRadio(radio)}>
+                          <Button size="sm" variant="outline" onClick={() => handleEdit(radio)}>
                             <Edit className="w-4 h-4" />
                           </Button>
                           <Button
@@ -821,7 +831,6 @@ const CadastroRadios = () => {
                             variant="ghost"
                             className="text-destructive"
                             onClick={() => openDeleteDialog(radio)}
-                            disabled={!canManageRadio(radio)}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>

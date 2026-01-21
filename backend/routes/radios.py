@@ -91,14 +91,10 @@ def create_radio():
 @token_required
 def update_radio(radio_id):
     ctx = get_user_ctx()
-    is_admin = ctx.get('is_admin', False)
     radio = Radio.query.filter_by(id=radio_id).first()
     if not radio:
         return jsonify({'error': 'Radio not found'}), 404
-    if not is_admin and not _radio_access_allowed(radio, ctx):
-        return jsonify({'error': 'Radio not found'}), 404
-    
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     if 'nome' in data:
         radio.nome = data['nome']
     if 'stream_url' in data:
@@ -128,11 +124,8 @@ def update_radio(radio_id):
 @token_required
 def delete_radio(radio_id):
     ctx = get_user_ctx()
-    is_admin = ctx.get('is_admin', False)
     radio = Radio.query.filter_by(id=radio_id).first()
     if not radio:
-        return jsonify({'error': 'Radio not found'}), 404
-    if not is_admin and not _radio_access_allowed(radio, ctx):
         return jsonify({'error': 'Radio not found'}), 404
     
     db.session.delete(radio)
