@@ -24,20 +24,47 @@ ACTIVE_PROCESSES: Dict[str, subprocess.Popen] = {}
 
 def _validate_stream_url_http(stream_url, timeout_seconds):
     timeout = max(2, int(timeout_seconds or 8))
-    headers = {"User-Agent": "Mozilla/5.0", "Icy-MetaData": "1"}
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Icy-MetaData": "1",
+        "Accept": "*/*",
+    }
     try:
         with requests.get(
             stream_url,
             headers=headers,
             stream=True,
             timeout=(timeout, timeout),
+            allow_redirects=True,
         ) as resp:
             if resp.status_code >= 400:
                 return False, f"HTTP {resp.status_code}"
-            for chunk in resp.iter_content(chunk_size=1024):
+
+            content_type = (resp.headers.get("Content-Type") or "").lower()
+            is_html = "text/html" in content_type or "application/xhtml+xml" in content_type
+            is_audio = "audio/" in content_type
+            is_playlist = "mpegurl" in content_type
+
+            first_chunk = b""
+            for chunk in resp.iter_content(chunk_size=4096):
                 if chunk:
-                    return True, None
-            return False, "no data received"
+                    first_chunk = chunk
+                    break
+
+            if not first_chunk:
+                return False, "no data received"
+
+            snippet = first_chunk[:200].lower()
+            if is_html and (b"<html" in snippet or b"<!doctype html" in snippet):
+                return False, "html response"
+
+            if is_audio or is_playlist:
+                return True, None
+
+            if b"#extm3u" in snippet or b"[playlist]" in snippet:
+                return True, None
+
+            return True, None
     except requests.RequestException as exc:
         return False, str(exc)
 
@@ -77,6 +104,11 @@ def validate_stream_url(stream_url, *, timeout_seconds=None):
         if err:
             err = err.splitlines()[-1]
             err = err[:200]
+        if str(stream_url).lower().startswith(("http://", "https://")):
+            http_ok, http_reason = _validate_stream_url_http(stream_url, timeout)
+            if http_ok:
+                return True, None
+            return False, http_reason or err or "stream unavailable"
         return False, err or "stream unavailable"
 
     return True, None

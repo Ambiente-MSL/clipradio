@@ -1,5 +1,5 @@
-import argparse
 import csv
+import argparse
 import os
 import posixpath
 import sys
