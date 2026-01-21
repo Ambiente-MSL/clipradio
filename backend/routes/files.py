@@ -19,22 +19,28 @@ def get_audio(filename):
 
     # Fallback: buscar no Dropbox quando o arquivo local foi arquivado/deletado
     try:
-        from services.dropbox_service import build_remote_audio_path, download_response, get_dropbox_config
+        from services.dropbox_service import build_candidate_audio_paths, download_response, get_dropbox_config
 
         dropbox_cfg = get_dropbox_config()
         if not dropbox_cfg.is_ready:
             return jsonify({'error': 'File not found'}), 404
 
-        remote_path = build_remote_audio_path(filename, base_path=dropbox_cfg.audio_path)
         range_header = request.headers.get('Range')
-        resp = download_response(remote_path, token=dropbox_cfg.access_token, range_header=range_header)
-        if resp.status_code in (404, 409):
-            return jsonify({'error': 'File not found'}), 404
-        if not resp.ok and resp.status_code != 206:
+        resp = None
+        candidates = build_candidate_audio_paths(filename, base_path=dropbox_cfg.audio_path)
+        for remote_path in candidates:
+            resp = download_response(remote_path, token=dropbox_cfg.access_token, range_header=range_header)
+            if resp.status_code in (404, 409):
+                continue
+            if resp.ok or resp.status_code == 206:
+                break
             try:
                 current_app.logger.error(f"Dropbox download falhou ({resp.status_code}): {resp.text}")
             except Exception:
                 pass
+            return jsonify({'error': 'File not found'}), 404
+
+        if resp is None or resp.status_code in (404, 409):
             return jsonify({'error': 'File not found'}), 404
 
         headers = {}

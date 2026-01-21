@@ -53,6 +53,7 @@ class Config:
     DROPBOX_UPLOAD_ENABLED = os.getenv('DROPBOX_UPLOAD_ENABLED', 'false').lower() == 'true'
     DROPBOX_ACCESS_TOKEN = os.getenv('DROPBOX_ACCESS_TOKEN')
     DROPBOX_AUDIO_PATH = os.getenv('DROPBOX_AUDIO_PATH', '/clipradio/audio')
+    DROPBOX_AUDIO_LAYOUT = os.getenv('DROPBOX_AUDIO_LAYOUT', 'flat')
     DROPBOX_DELETE_LOCAL_AFTER_UPLOAD = os.getenv('DROPBOX_DELETE_LOCAL_AFTER_UPLOAD', 'true').lower() == 'true'
     DROPBOX_LOCAL_RETENTION_DAYS = int(os.getenv('DROPBOX_LOCAL_RETENTION_DAYS', '0') or 0)
 

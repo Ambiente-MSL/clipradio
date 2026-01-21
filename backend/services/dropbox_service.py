@@ -1,6 +1,8 @@
 import json
 import os
 import posixpath
+import re
+from datetime import datetime
 from urllib.parse import unquote, urlparse
 from dataclasses import dataclass
 from typing import Generator, Optional, Tuple
@@ -20,6 +22,7 @@ class DropboxConfig:
     enabled: bool
     access_token: Optional[str]
     audio_path: str
+    audio_layout: str
     delete_local_after_upload: bool
     local_retention_days: int
 
@@ -38,6 +41,13 @@ def _as_bool(value, default: bool = False) -> bool:
     if isinstance(value, bool):
         return value
     return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _normalize_layout(value: Optional[str]) -> str:
+    layout = str(value or "").strip().lower()
+    if layout in {"date", "flat"}:
+        return layout
+    return "flat"
 
 
 def _normalize_dropbox_audio_path(value: Optional[str]) -> str:
@@ -66,6 +76,22 @@ def _normalize_dropbox_audio_path(value: Optional[str]) -> str:
     return raw or "/clipradio/audio"
 
 
+_AUDIO_DATE_RE = re.compile(r"(\\d{8})_(\\d{6})")
+
+
+def get_audio_date_path(filename: str) -> Optional[str]:
+    name = os.path.basename(str(filename or ""))
+    match = _AUDIO_DATE_RE.search(name)
+    if not match:
+        return None
+    date_part = match.group(1)
+    try:
+        date_obj = datetime.strptime(date_part, "%Y%m%d")
+    except ValueError:
+        return None
+    return date_obj.strftime("%Y/%m/%d")
+
+
 def get_dropbox_config() -> DropboxConfig:
     """
     Lê configuração do Dropbox a partir do Flask app (se disponível) ou variáveis de ambiente.
@@ -81,6 +107,7 @@ def get_dropbox_config() -> DropboxConfig:
     enabled = _as_bool(cfg.get("DROPBOX_UPLOAD_ENABLED", os.getenv("DROPBOX_UPLOAD_ENABLED")), default=False)
     access_token = cfg.get("DROPBOX_ACCESS_TOKEN") or os.getenv("DROPBOX_ACCESS_TOKEN")
     audio_path = cfg.get("DROPBOX_AUDIO_PATH") or os.getenv("DROPBOX_AUDIO_PATH", "/clipradio/audio")
+    audio_layout = cfg.get("DROPBOX_AUDIO_LAYOUT") or os.getenv("DROPBOX_AUDIO_LAYOUT", "flat")
     delete_local_after_upload = _as_bool(
         cfg.get("DROPBOX_DELETE_LOCAL_AFTER_UPLOAD", os.getenv("DROPBOX_DELETE_LOCAL_AFTER_UPLOAD", "true")),
         default=True,
@@ -93,21 +120,63 @@ def get_dropbox_config() -> DropboxConfig:
         local_retention_days = 0
 
     audio_path = _normalize_dropbox_audio_path(audio_path)
+    audio_layout = _normalize_layout(audio_layout)
 
     return DropboxConfig(
         enabled=enabled,
         access_token=access_token,
         audio_path=audio_path,
+        audio_layout=audio_layout,
         delete_local_after_upload=delete_local_after_upload,
         local_retention_days=max(0, local_retention_days),
     )
 
 
-def build_remote_audio_path(filename: str, *, base_path: Optional[str] = None) -> str:
+def build_remote_audio_path(
+    filename: str,
+    *,
+    base_path: Optional[str] = None,
+    layout: Optional[str] = None,
+) -> str:
     cfg = get_dropbox_config()
     root = (base_path or cfg.audio_path or "/clipradio/audio").rstrip("/")
     name = str(filename or "").lstrip("/")
-    return f"{root}/{name}"
+    layout = _normalize_layout(layout or cfg.audio_layout)
+    if layout == "date":
+        date_path = get_audio_date_path(name)
+        if date_path:
+            return posixpath.join(root, date_path, name)
+    return posixpath.join(root, name)
+
+
+def build_candidate_audio_paths(
+    filename: str,
+    *,
+    base_path: Optional[str] = None,
+    layout: Optional[str] = None,
+) -> Tuple[str, ...]:
+    cfg = get_dropbox_config()
+    root = (base_path or cfg.audio_path or "/clipradio/audio").rstrip("/")
+    name = str(filename or "").lstrip("/")
+    layout = _normalize_layout(layout or cfg.audio_layout)
+
+    candidates = []
+    if layout == "date":
+        date_path = get_audio_date_path(name)
+        if date_path:
+            candidates.append(posixpath.join(root, date_path, name))
+        candidates.append(posixpath.join(root, name))
+    else:
+        candidates.append(posixpath.join(root, name))
+
+    seen = set()
+    unique = []
+    for path in candidates:
+        if path in seen:
+            continue
+        seen.add(path)
+        unique.append(path)
+    return tuple(unique)
 
 
 def _headers(token: str, api_arg: dict, *, content: bool) -> dict:
@@ -277,30 +346,94 @@ def stream_download(
             yield chunk
 
 
+def list_folder_entries(
+    path: str,
+    *,
+    token: Optional[str] = None,
+    recursive: bool = False,
+    timeout: Tuple[int, int] = (10, 30),
+) -> list:
+    cfg = get_dropbox_config()
+    token = token or cfg.access_token
+    if not token:
+        raise DropboxError("DROPBOX_ACCESS_TOKEN nǜo configurado")
+
+    entries = []
+    payload = {"path": path, "recursive": bool(recursive), "include_deleted": False}
+    resp = requests.post(
+        f"{DROPBOX_API_BASE}/files/list_folder",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json=payload,
+        timeout=timeout,
+    )
+    _raise_for_response(resp, action="list_folder")
+    data = resp.json() or {}
+    entries.extend(data.get("entries") or [])
+    cursor = data.get("cursor")
+    while data.get("has_more"):
+        resp = requests.post(
+            f"{DROPBOX_API_BASE}/files/list_folder/continue",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={"cursor": cursor},
+            timeout=timeout,
+        )
+        _raise_for_response(resp, action="list_folder/continue")
+        data = resp.json() or {}
+        entries.extend(data.get("entries") or [])
+        cursor = data.get("cursor")
+    return entries
+
+
+def move_file(
+    from_path: str,
+    to_path: str,
+    *,
+    token: Optional[str] = None,
+    autorename: bool = False,
+    timeout: Tuple[int, int] = (10, 30),
+) -> dict:
+    cfg = get_dropbox_config()
+    token = token or cfg.access_token
+    if not token:
+        raise DropboxError("DROPBOX_ACCESS_TOKEN nǜo configurado")
+
+    resp = requests.post(
+        f"{DROPBOX_API_BASE}/files/move_v2",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json={"from_path": from_path, "to_path": to_path, "autorename": autorename},
+        timeout=timeout,
+    )
+    _raise_for_response(resp, action="move")
+    return resp.json()
+
+
 def _ensure_folder(path: str, *, token: str, timeout: Tuple[int, int] = (10, 30)) -> None:
     normalized = str(path or "").strip()
     if not normalized or normalized == "/":
         return
     if not normalized.startswith("/"):
         normalized = f"/{normalized}"
-
-    resp = requests.post(
-        f"{DROPBOX_API_BASE}/files/create_folder_v2",
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        },
-        json={"path": normalized, "autorename": False},
-        timeout=timeout,
-    )
-    if resp.ok:
-        return
-    if resp.status_code == 409:
-        try:
-            data = resp.json() or {}
-            summary = str(data.get("error_summary") or "")
-            if "conflict" in summary and "folder" in summary:
-                return
-        except Exception:
-            pass
-    _raise_for_response(resp, action="create_folder")
+    parts = [part for part in normalized.strip("/").split("/") if part]
+    current = ""
+    for part in parts:
+        current = f"{current}/{part}"
+        resp = requests.post(
+            f"{DROPBOX_API_BASE}/files/create_folder_v2",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+            json={"path": current, "autorename": False},
+            timeout=timeout,
+        )
+        if resp.ok:
+            continue
+        if resp.status_code == 409:
+            try:
+                data = resp.json() or {}
+                summary = str(data.get("error_summary") or "")
+                if "conflict" in summary and "folder" in summary:
+                    continue
+            except Exception:
+                pass
+        _raise_for_response(resp, action="create_folder")
