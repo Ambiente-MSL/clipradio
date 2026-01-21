@@ -1,21 +1,19 @@
 import argparse
+import csv
 import os
 import posixpath
 import sys
+from datetime import datetime
+from types import SimpleNamespace
 
 BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if BACKEND_ROOT not in sys.path:
     sys.path.insert(0, BACKEND_ROOT)
 
-from flask import Flask
-
-from app import db
-from config import Config
-from models.gravacao import Gravacao
-from models.radio import Radio
 from services.dropbox_service import (
     DropboxError,
     build_audio_destination,
+    build_remote_audio_path,
     ensure_folder,
     get_audio_id_from_filename,
     get_dropbox_config,
@@ -24,16 +22,61 @@ from services.dropbox_service import (
 )
 
 
-def create_db_app():
-    app = Flask(__name__)
-    app.config.from_object(Config)
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = Config.SQLALCHEMY_ENGINE_OPTIONS
-    db.init_app(app)
+def parse_datetime(value):
+    if not value:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    if raw.endswith("Z"):
+        raw = f"{raw[:-1]}+00:00"
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"):
+        try:
+            return datetime.strptime(raw, fmt)
+        except ValueError:
+            pass
     try:
-        Config.init_app(app)
-    except Exception:
-        pass
-    return app
+        return datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
+def load_metadata_csv(path, *, delimiter=",", encoding="utf-8"):
+    metadata_by_name = {}
+    metadata_by_id = {}
+    if not path:
+        return metadata_by_name, metadata_by_id
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"Arquivo CSV nao encontrado: {path}")
+
+    with open(path, "r", encoding=encoding, newline="") as handle:
+        reader = csv.DictReader(handle, delimiter=delimiter)
+        for row in reader:
+            normalized = {str(k or "").strip().lower(): (v or "").strip() for k, v in row.items()}
+            gravacao_id = normalized.get("id") or normalized.get("gravacao_id")
+            arquivo_nome = normalized.get("arquivo_nome") or normalized.get("filename") or normalized.get("arquivo")
+            arquivo_url = normalized.get("arquivo_url") or normalized.get("url")
+            criado_em = normalized.get("criado_em") or normalized.get("created_at") or normalized.get("criado_em_local")
+            radio_nome = normalized.get("radio_nome") or normalized.get("radio")
+            cidade = normalized.get("cidade")
+            estado = normalized.get("estado") or normalized.get("uf")
+
+            meta = {
+                "id": gravacao_id,
+                "arquivo_nome": arquivo_nome,
+                "arquivo_url": arquivo_url,
+                "criado_em": parse_datetime(criado_em),
+                "radio_nome": radio_nome,
+                "cidade": cidade,
+                "estado": estado,
+            }
+
+            if arquivo_nome:
+                metadata_by_name.setdefault(arquivo_nome, meta)
+            if gravacao_id:
+                metadata_by_id.setdefault(gravacao_id, meta)
+
+    return metadata_by_name, metadata_by_id
 
 
 def iter_dropbox_audio_entries(base_path: str, *, token: str):
@@ -45,7 +88,7 @@ def iter_dropbox_audio_entries(base_path: str, *, token: str):
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Reorganiza/renomeia arquivos de audio no Dropbox com hierarquia por data/estado/cidade/radio.",
+        description="Reorganiza/renomeia arquivos de audio no Dropbox sem acessar o banco.",
     )
     parser.add_argument(
         "--base-path",
@@ -55,7 +98,25 @@ def main() -> int:
     parser.add_argument(
         "--layout",
         default=os.getenv("DROPBOX_AUDIO_LAYOUT", "hierarchy"),
-        help="Layout desejado (hierarchy). Default segue DROPBOX_AUDIO_LAYOUT.",
+        help="Layout desejado (hierarchy, date, flat). Default segue DROPBOX_AUDIO_LAYOUT.",
+    )
+    parser.add_argument(
+        "--metadata-csv",
+        help="CSV com colunas: id, arquivo_nome, criado_em, radio_nome, cidade, estado (opcional arquivo_url).",
+    )
+    parser.add_argument(
+        "--csv-delimiter",
+        default=",",
+        help="Delimitador do CSV (default: ',').",
+    )
+    parser.add_argument(
+        "--csv-encoding",
+        default="utf-8",
+        help="Encoding do CSV (default: utf-8).",
+    )
+    parser.add_argument(
+        "--output-csv",
+        help="Salva um CSV com id, old_name, new_name, new_path.",
     )
     parser.add_argument(
         "--dry-run",
@@ -77,106 +138,100 @@ def main() -> int:
         print(f"Nenhum arquivo encontrado em {base_path}")
         return 0
 
-    entry_by_name = {}
-    entry_by_id = {}
+    metadata_by_name, metadata_by_id = load_metadata_csv(
+        args.metadata_csv,
+        delimiter=args.csv_delimiter,
+        encoding=args.csv_encoding,
+    )
+
+    print(f"Encontradas {len(entries)} arquivo(s) no Dropbox")
+    if args.metadata_csv:
+        print(f"Metadata carregada: {len(metadata_by_id)} por id, {len(metadata_by_name)} por nome")
+    print(f"Layout alvo: {layout}")
+
+    moved = 0
+    skipped = 0
+    failed = 0
+    output_rows = []
+
     for entry in entries:
-        path = entry.get("path_display") or entry.get("path_lower")
-        if not path:
+        current_path = entry.get("path_display") or entry.get("path_lower")
+        if not current_path:
+            skipped += 1
             continue
-        name = os.path.basename(path)
-        entry_by_name.setdefault(name, []).append(path)
-        audio_id = get_audio_id_from_filename(name)
-        if audio_id:
-            entry_by_id.setdefault(audio_id, []).append(path)
+        filename = os.path.basename(current_path)
 
-    app = create_db_app()
-    with app.app_context():
-        gravacoes = Gravacao.query.all()
+        meta = metadata_by_name.get(filename)
+        if not meta:
+            audio_id = get_audio_id_from_filename(filename)
+            if audio_id:
+                meta = metadata_by_id.get(audio_id)
 
-        print(f"Encontradas {len(entries)} arquivo(s) no Dropbox")
-        print(f"Encontradas {len(gravacoes)} gravacao(oes) no banco")
-        print(f"Layout alvo: {layout}")
-
-        moved = 0
-        updated = 0
-        skipped = 0
-        failed = 0
-
-        for gravacao in gravacoes:
-            current_name = gravacao.arquivo_nome
-            if not current_name and gravacao.arquivo_url:
-                current_name = gravacao.arquivo_url.rsplit("/", 1)[-1]
-            current_name = current_name or ""
-
-            radio_obj = gravacao.radio or Radio.query.get(gravacao.radio_id)
-            desired_path, desired_name = build_audio_destination(
-                gravacao,
-                radio=radio_obj,
-                original_filename=current_name,
-                base_path=base_path,
-                layout=layout,
-            )
-
-            current_paths = []
-            if current_name:
-                current_paths = entry_by_name.get(current_name, [])
-            if not current_paths and desired_name:
-                current_paths = entry_by_name.get(desired_name, [])
-            if not current_paths:
-                current_paths = entry_by_id.get(gravacao.id, [])
-
-            if not current_paths:
+        if layout == "hierarchy":
+            if not meta:
                 skipped += 1
                 continue
 
-            current_path = current_paths[0]
-            if current_path.lower() == desired_path.lower():
-                if desired_name and gravacao.arquivo_nome != desired_name:
-                    if args.dry_run:
-                        print(f"[dry-run] update DB {gravacao.id} nome={desired_name}")
-                    else:
-                        gravacao.arquivo_nome = desired_name
-                        gravacao.arquivo_url = f"/api/files/audio/{desired_name}"
-                        try:
-                            db.session.commit()
-                            updated += 1
-                        except Exception:
-                            db.session.rollback()
-                            failed += 1
-                else:
-                    skipped += 1
-                continue
+            gravacao = SimpleNamespace(
+                id=meta.get("id") or get_audio_id_from_filename(filename) or filename,
+                criado_em=meta.get("criado_em"),
+                arquivo_nome=meta.get("arquivo_nome") or filename,
+                arquivo_url=meta.get("arquivo_url"),
+            )
+            radio = SimpleNamespace(
+                nome=meta.get("radio_nome"),
+                cidade=meta.get("cidade"),
+                estado=meta.get("estado"),
+            )
+            desired_path, desired_name = build_audio_destination(
+                gravacao,
+                radio=radio,
+                original_filename=filename,
+                base_path=base_path,
+                layout=layout,
+            )
+        else:
+            desired_name = filename
+            desired_path = build_remote_audio_path(filename, base_path=base_path, layout=layout)
 
-            if args.dry_run:
-                print(f"[dry-run] move {current_path} -> {desired_path}")
-                moved += 1
-                continue
+        if current_path.lower() == desired_path.lower():
+            skipped += 1
+            continue
 
-            try:
-                ensure_folder(posixpath.dirname(desired_path), token=cfg.access_token)
-                move_file(current_path, desired_path, token=cfg.access_token, autorename=False)
-                moved += 1
-            except DropboxError as exc:
-                failed += 1
-                print(f"Falha ao mover {current_path}: {exc}")
-                continue
-            except Exception as exc:
-                failed += 1
-                print(f"Erro inesperado ao mover {current_path}: {exc}")
-                continue
+        output_rows.append({
+            "id": meta.get("id") if meta else "",
+            "old_name": filename,
+            "new_name": desired_name,
+            "new_path": desired_path,
+        })
 
-            if desired_name and gravacao.arquivo_nome != desired_name:
-                gravacao.arquivo_nome = desired_name
-                gravacao.arquivo_url = f"/api/files/audio/{desired_name}"
-                try:
-                    db.session.commit()
-                    updated += 1
-                except Exception:
-                    db.session.rollback()
-                    failed += 1
+        if args.dry_run:
+            print(f"[dry-run] move {current_path} -> {desired_path}")
+            moved += 1
+            continue
 
-        print(f"Concluido. Movidos: {moved}, Atualizados DB: {updated}, Ignorados: {skipped}, Falhas: {failed}")
-        return 0 if failed == 0 else 1
+        try:
+            ensure_folder(posixpath.dirname(desired_path), token=cfg.access_token)
+            move_file(current_path, desired_path, token=cfg.access_token, autorename=False)
+            moved += 1
+        except DropboxError as exc:
+            failed += 1
+            print(f"Falha ao mover {current_path}: {exc}")
+        except Exception as exc:
+            failed += 1
+            print(f"Erro inesperado ao mover {current_path}: {exc}")
+
+    if args.output_csv and output_rows:
+        try:
+            with open(args.output_csv, "w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=["id", "old_name", "new_name", "new_path"])
+                writer.writeheader()
+                writer.writerows(output_rows)
+        except Exception as exc:
+            print(f"Falha ao salvar output CSV: {exc}")
+
+    print(f"Concluido. Movidos: {moved}, Ignorados: {skipped}, Falhas: {failed}")
+    return 0 if failed == 0 else 1
 
 
 if __name__ == "__main__":
