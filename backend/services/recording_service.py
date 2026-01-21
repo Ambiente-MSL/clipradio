@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Dict
 
+import requests
+
 from flask import current_app
 from app import db
 from config import Config
@@ -18,6 +20,66 @@ ALLOWED_BITRATES = {96, 128}
 ALLOWED_FORMATS = {'mp3', 'opus'}
 ALLOWED_AUDIO_MODES = {'mono', 'stereo'}
 ACTIVE_PROCESSES: Dict[str, subprocess.Popen] = {}
+
+
+def _validate_stream_url_http(stream_url, timeout_seconds):
+    timeout = max(2, int(timeout_seconds or 8))
+    headers = {"User-Agent": "Mozilla/5.0", "Icy-MetaData": "1"}
+    try:
+        with requests.get(
+            stream_url,
+            headers=headers,
+            stream=True,
+            timeout=(timeout, timeout),
+        ) as resp:
+            if resp.status_code >= 400:
+                return False, f"HTTP {resp.status_code}"
+            for chunk in resp.iter_content(chunk_size=1024):
+                if chunk:
+                    return True, None
+            return False, "no data received"
+    except requests.RequestException as exc:
+        return False, str(exc)
+
+
+def validate_stream_url(stream_url, *, timeout_seconds=None):
+    if not stream_url:
+        return False, "stream_url missing"
+    timeout = max(2, int(timeout_seconds or Config.STREAM_VALIDATE_TIMEOUT_SECONDS or 8))
+    rw_timeout = str(timeout * 1000000)
+    cmd = ["ffprobe", "-hide_banner", "-loglevel", "error"]
+    if str(stream_url).lower().startswith(("http://", "https://")):
+        cmd += ["-user_agent", "Mozilla/5.0"]
+    cmd += [
+        "-rw_timeout",
+        rw_timeout,
+        "-i",
+        stream_url,
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+    ]
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout + 2,
+        )
+    except FileNotFoundError:
+        return _validate_stream_url_http(stream_url, timeout)
+    except subprocess.TimeoutExpired:
+        return False, "timeout"
+
+    if result.returncode != 0:
+        err = result.stderr.decode(errors="ignore").strip()
+        if err:
+            err = err.splitlines()[-1]
+            err = err[:200]
+        return False, err or "stream unavailable"
+
+    return True, None
 
 
 def _get_audio_filepath(gravacao):
@@ -247,12 +309,29 @@ def start_recording(gravacao, *, duration_seconds=None, agendamento=None, block=
     # Guardar stderr para inspecionar falhas do ffmpeg (evita arquivo 0 bytes silencioso)
     ffmpeg_process = None
     try:
+        stream_url = radio.stream_url
         ffmpeg_cmd = [
             'ffmpeg',
+            '-hide_banner',
+            '-loglevel',
+            'error',
             '-nostdin',
             '-y',
+        ]
+        if str(stream_url).lower().startswith(('http://', 'https://')):
+            ffmpeg_cmd += [
+                '-reconnect',
+                '1',
+                '-reconnect_streamed',
+                '1',
+                '-reconnect_delay_max',
+                '5',
+                '-user_agent',
+                'Mozilla/5.0',
+            ]
+        ffmpeg_cmd += [
             '-i',
-            radio.stream_url,
+            stream_url,
             '-t',
             str(duration_seconds),
         ]
@@ -306,8 +385,12 @@ def start_recording(gravacao, *, duration_seconds=None, agendamento=None, block=
 
             file_exists = filepath and os.path.exists(filepath)
             file_size = os.path.getsize(filepath) if file_exists else 0
-            min_ok_bytes = 1024  # ~1KB para considerar arquivo válido
-            file_ok = file_exists and file_size >= min_ok_bytes
+            real_duration = _probe_duration_seconds(filepath)
+            min_seconds = min(duration_seconds, MIN_RECORD_SECONDS)
+            expected_bytes = int((bitrate_kbps * 1000 / 8) * min_seconds)
+            min_ok_bytes = max(8 * 1024, int(expected_bytes * 0.1))
+            duration_ok = real_duration is not None and real_duration >= MIN_RECORD_SECONDS
+            file_ok = file_exists and (duration_ok or (real_duration is None and file_size >= min_ok_bytes))
 
             if return_code == 0 and file_ok:
                 _finalizar_gravacao(gravacao, 'concluido', filepath, duration_seconds, agendamento)
@@ -315,7 +398,8 @@ def start_recording(gravacao, *, duration_seconds=None, agendamento=None, block=
                 # Logar erro para depurar streams que nÇ¬o gravam
                 msg = (
                     f"ffmpeg failed for gravacao {gravacao.id} "
-                    f"(return_code={return_code}, exists={file_exists}, size={file_size}, timed_out={timed_out})"
+                    f"(return_code={return_code}, exists={file_exists}, size={file_size}, "
+                    f"duration={real_duration}, timed_out={timed_out})"
                 )
                 try:
                     if stderr_output:

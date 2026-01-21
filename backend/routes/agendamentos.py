@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify, Response
 from app import db
+from config import Config
 from models.agendamento import Agendamento
+from models.radio import Radio
 from utils.jwt_utils import token_required, decode_token
 from flask import request as flask_request
 from datetime import datetime, timedelta
@@ -8,6 +10,7 @@ from zoneinfo import ZoneInfo
 import csv
 import io
 from datetime import datetime as dt_mod
+from services.recording_service import validate_stream_url
 from services.scheduler_service import schedule_agendamento, unschedule_agendamento
 
 LOCAL_TZ = ZoneInfo("America/Fortaleza")
@@ -281,6 +284,32 @@ def _generate_pdf(rows, start_date=None, end_date=None):
 def _agendamento_access_allowed(agendamento, ctx):
     return bool(ctx.get('is_admin') or agendamento.user_id == ctx.get('user_id'))
 
+
+def _validate_agendamento_stream(radio_id):
+    radio = Radio.query.get(radio_id) if radio_id else None
+    if not radio or not radio.stream_url:
+        return False, "radio not found or stream_url missing"
+    ok, reason = validate_stream_url(
+        radio.stream_url,
+        timeout_seconds=Config.STREAM_VALIDATE_TIMEOUT_SECONDS,
+    )
+    if not ok:
+        return False, reason or "stream unavailable"
+    return True, None
+
+
+def _stream_validation_error_message(reason):
+    value = str(reason or "").lower()
+    if "timeout" in value:
+        return "O stream da rádio demorou para responder. Verifique a URL ou tente novamente em alguns minutos."
+    if "http 404" in value or "not found" in value:
+        return "Não encontramos o stream nesse endereço. Confira a URL informada."
+    if "http" in value:
+        return "O endereço do stream não respondeu corretamente. Verifique se a URL está certa."
+    if "no data" in value:
+        return "O stream respondeu, mas não enviou áudio. A rádio pode estar fora do ar."
+    return "Não foi possível validar o stream da rádio agora. Confira a URL e tente novamente."
+
 @bp.route('', methods=['GET'])
 @token_required
 def get_agendamentos():
@@ -366,13 +395,19 @@ def create_agendamento():
         return jsonify({'error': 'radio_id, data_inicio and duracao_minutos are required'}), 400
 
     
+    status = data.get('status', 'agendado')
+    if status == 'agendado' and Config.STREAM_VALIDATE_ON_SCHEDULE:
+        ok, reason = _validate_agendamento_stream(data['radio_id'])
+        if not ok:
+            return jsonify({'error': _stream_validation_error_message(reason)}), 400
+
     agendamento = Agendamento(
         user_id=user_id,
         radio_id=data['radio_id'],
         data_inicio=parse_datetime_local(data['data_inicio']),
         duracao_minutos=data['duracao_minutos'],
         tipo_recorrencia=data.get('tipo_recorrencia', 'none'),
-        status=data.get('status', 'agendado')
+        status=status
     )
     
     if 'dias_semana' in data:
@@ -410,6 +445,13 @@ def update_agendamento(agendamento_id):
     
     data = request.get_json()
 
+    next_radio_id = data.get('radio_id', agendamento.radio_id)
+    next_status = data.get('status', agendamento.status)
+    if next_status == 'agendado' and Config.STREAM_VALIDATE_ON_SCHEDULE:
+        ok, reason = _validate_agendamento_stream(next_radio_id)
+        if not ok:
+            return jsonify({'error': _stream_validation_error_message(reason)}), 400
+
     if 'radio_id' in data:
         agendamento.radio_id = data['radio_id']
     if 'data_inicio' in data:
@@ -424,7 +466,7 @@ def update_agendamento(agendamento_id):
         agendamento.set_dias_semana_list(data['dias_semana'])
     if 'palavras_chave' in data:
         agendamento.set_palavras_chave_list(data['palavras_chave'])
-    
+
     db.session.commit()
     
     # Broadcast update
@@ -480,7 +522,13 @@ def toggle_status(agendamento_id):
     if not is_admin and not _agendamento_access_allowed(agendamento, ctx):
         return jsonify({'error': 'Agendamento not found'}), 404
     
-    agendamento.status = 'inativo' if agendamento.status == 'agendado' else 'agendado'
+    next_status = 'inativo' if agendamento.status == 'agendado' else 'agendado'
+    if next_status == 'agendado' and Config.STREAM_VALIDATE_ON_SCHEDULE:
+        ok, reason = _validate_agendamento_stream(agendamento.radio_id)
+        if not ok:
+            return jsonify({'error': _stream_validation_error_message(reason)}), 400
+
+    agendamento.status = next_status
     db.session.commit()
 
     # Atualiza job do scheduler conforme status

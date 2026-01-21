@@ -68,6 +68,10 @@ class Config:
     TRANSCRIBE_CHUNK_LENGTH = int(os.getenv('TRANSCRIBE_CHUNK_LENGTH', '30') or 30)
     TRANSCRIBE_TEXT_UPDATE_SECONDS = int(os.getenv('TRANSCRIBE_TEXT_UPDATE_SECONDS', '10') or 10)
     TRANSCRIBE_MAX_CONCURRENT = int(os.getenv('TRANSCRIBE_MAX_CONCURRENT', '1') or 1)
+
+    STREAM_VALIDATE_ON_SCHEDULE = os.getenv('STREAM_VALIDATE_ON_SCHEDULE', 'true').lower() == 'true'
+    STREAM_VALIDATE_ON_EXECUTE = os.getenv('STREAM_VALIDATE_ON_EXECUTE', 'true').lower() == 'true'
+    STREAM_VALIDATE_TIMEOUT_SECONDS = int(os.getenv('STREAM_VALIDATE_TIMEOUT_SECONDS', '8') or 8)
     
     @staticmethod
     def init_app(app):

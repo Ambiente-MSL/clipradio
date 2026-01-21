@@ -84,6 +84,25 @@ const CadastroRadios = () => {
     setStreamStatus({ state: 'idle', message: '' })
   }, [])
 
+  const getPlaybackErrorMessage = (err) => {
+    const name = String(err?.name || '').toLowerCase()
+    const message = String(err?.message || '').toLowerCase()
+
+    if (name === 'notallowederror') {
+      return 'O navegador bloqueou a reprodução automática. Clique em Reproduzir novamente.'
+    }
+    if (name === 'notsupportederror' || message.includes('supported source') || message.includes('not supported')) {
+      return 'Este stream não é compatível com o navegador. Confira o formato ou use outra URL.'
+    }
+    if (name === 'aborterror' || message.includes('interrupted by a call to pause') || message.includes('interrupted')) {
+      return 'A reprodução foi interrompida. Tente novamente.'
+    }
+    if (message.includes('failed to fetch') || message.includes('network') || message.includes('404') || message.includes('not found')) {
+      return 'Não foi possível conectar ao stream. Verifique a URL e tente novamente.'
+    }
+    return 'Não foi possível reproduzir este stream agora. Verifique a URL ou tente novamente.'
+  }
+
   const fetchRadios = useCallback(async () => {
     setLoading(true)
     try {
@@ -255,8 +274,8 @@ const CadastroRadios = () => {
     const handleError = () => {
       setIsBuffering(false)
       toast({
-        title: 'Erro ao reproduzir',
-        description: 'Não foi possível tocar o stream da rádio.',
+        title: 'Não foi possível reproduzir',
+        description: 'Não foi possível carregar o stream da rádio. Verifique a URL ou tente novamente.',
         variant: 'destructive',
       })
       setCurrentRadioId(null)
@@ -298,8 +317,8 @@ const CadastroRadios = () => {
       } catch (err) {
         setIsBuffering(false)
         toast({
-          title: 'Erro ao reproduzir',
-          description: err?.message || 'Verifique se a URL do stream está acessível.',
+          title: 'Não foi possível reproduzir',
+          description: getPlaybackErrorMessage(err),
           variant: 'destructive',
         })
         setCurrentRadioId(null)

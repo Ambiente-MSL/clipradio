@@ -9,9 +9,11 @@ from apscheduler.triggers.interval import IntervalTrigger
 from flask import current_app
 
 from app import db
+from config import Config
 from models.agendamento import Agendamento
 from models.gravacao import Gravacao
-from services.recording_service import start_recording
+from models.radio import Radio
+from services.recording_service import start_recording, validate_stream_url
 from services.websocket_service import broadcast_update
 
 LOCAL_TZ = ZoneInfo("America/Fortaleza")
@@ -290,6 +292,31 @@ def execute_agendamento(agendamento_id):
         agendamento = Agendamento.query.get(agendamento_id)
         if not agendamento or agendamento.status != 'agendado':
             return
+
+        if Config.STREAM_VALIDATE_ON_EXECUTE:
+            radio = Radio.query.get(agendamento.radio_id)
+            if not radio or not radio.stream_url:
+                agendamento.status = 'erro'
+                db.session.commit()
+                broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
+                unschedule_agendamento(agendamento.id)
+                return
+            ok, reason = validate_stream_url(
+                radio.stream_url,
+                timeout_seconds=Config.STREAM_VALIDATE_TIMEOUT_SECONDS,
+            )
+            if not ok:
+                agendamento.status = 'erro'
+                db.session.commit()
+                broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
+                try:
+                    current_app.logger.error(
+                        f"Agendamento {agendamento.id} falhou ao validar stream: {reason}"
+                    )
+                except Exception:
+                    pass
+                unschedule_agendamento(agendamento.id)
+                return
 
         gravacao = Gravacao(
             user_id=agendamento.user_id,
