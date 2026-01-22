@@ -13,6 +13,9 @@ class Config:
     _db_host = os.getenv('DB_HOST', 'db')
     _db_port = os.getenv('DB_PORT', '5432')
     _db_name = os.getenv('DB_NAME', '')
+    _db_pool_size = int(os.getenv('DB_POOL_SIZE', '10') or 10)
+    _db_max_overflow = int(os.getenv('DB_MAX_OVERFLOW', '20') or 20)
+    _db_pool_timeout = int(os.getenv('DB_POOL_TIMEOUT', '20') or 20)
     
     # URL encode a senha para evitar problemas com caracteres especiais
     _db_password_encoded = urllib.parse.quote_plus(_db_password) if _db_password else ''
@@ -36,7 +39,10 @@ class Config:
         # Evita conexoes "mortas" apos reinicio do banco
         'pool_pre_ping': True,
         # Recicla conexoes antigas para reduzir queda por timeout no servidor
-        'pool_recycle': 1800
+        'pool_recycle': 1800,
+        'pool_size': _db_pool_size,
+        'max_overflow': _db_max_overflow,
+        'pool_timeout': _db_pool_timeout
     }
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False

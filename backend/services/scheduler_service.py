@@ -124,6 +124,8 @@ def cleanup_local_audio_archived():
             print(f"cleanup_local_audio_archived falhou: {e}")
         except Exception:
             pass
+    finally:
+        db.session.remove()
 
 
 def _normalized_run_date(dt):
@@ -224,9 +226,15 @@ def cleanup_agendamentos_stuck():
                     broadcast_update(f"user_{ag.user_id}", "agendamento_updated", ag.to_dict())
     except Exception as e:
         try:
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
             print(f"cleanup_agendamentos_stuck falhou: {e}")
         except Exception:
             pass
+    finally:
+        db.session.remove()
 
 
 def unschedule_agendamento(agendamento_id):

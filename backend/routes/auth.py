@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError, OperationalError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError, OperationalError, TimeoutError
 import time
 from app import db
 from models.user import User
@@ -11,7 +11,7 @@ def _query_with_retry(query_fn, retries=1, delay=0.4):
     for attempt in range(retries + 1):
         try:
             return query_fn()
-        except OperationalError:
+        except (OperationalError, TimeoutError):
             current_app.logger.exception(
                 "Erro de banco (OperationalError) na tentativa %s/%s",
                 attempt + 1,
