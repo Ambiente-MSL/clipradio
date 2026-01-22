@@ -15,4 +15,4 @@ echo "PostgreSQL está pronto!"
 # flask db upgrade
 
 # Iniciar a aplicação
-exec gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:5000 --timeout 300 --access-logfile - --error-logfile - app:app
+exec gunicorn --worker-class eventlet -w 2 --bind 0.0.0.0:5000 --timeout 300 --access-logfile - --error-logfile - app:app
