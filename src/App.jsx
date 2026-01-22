@@ -28,7 +28,7 @@ function App() {
   return (
     <>
       <Helmet>
-        <title>Clipradio</title>
+        <title>Clipradio | Msl Estratégia</title>
         <meta
           name="description"
           content="Sistema avançado de gerenciamento de rádios com gravação automática e agendamento inteligente"

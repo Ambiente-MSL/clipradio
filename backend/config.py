@@ -32,7 +32,11 @@ class Config:
             'host': _db_host,
             'port': int(_db_port),
             'connect_timeout': 10
-        }
+        },
+        # Evita conexoes "mortas" apos reinicio do banco
+        'pool_pre_ping': True,
+        # Recicla conexoes antigas para reduzir queda por timeout no servidor
+        'pool_recycle': 1800
     }
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False

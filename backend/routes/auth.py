@@ -1,10 +1,28 @@
 from flask import Blueprint, request, jsonify, current_app
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError, OperationalError
+import time
 from app import db
 from models.user import User
 from utils.jwt_utils import create_token, token_required
 
 bp = Blueprint('auth', __name__)
+
+def _query_with_retry(query_fn, retries=1, delay=0.4):
+    for attempt in range(retries + 1):
+        try:
+            return query_fn()
+        except OperationalError:
+            current_app.logger.exception(
+                "Erro de banco (OperationalError) na tentativa %s/%s",
+                attempt + 1,
+                retries + 1
+            )
+            db.session.rollback()
+            db.engine.dispose()
+            if attempt < retries:
+                time.sleep(delay)
+                continue
+            raise
 
 @bp.route('/register', methods=['POST'])
 def register():
@@ -54,7 +72,13 @@ def login():
         return jsonify({'error': 'Email and password required'}), 400
     
     try:
-        user = User.query.filter_by(email=data.get('email')).first()
+        user = _query_with_retry(
+            lambda: User.query.filter_by(email=data.get('email')).first()
+        )
+    except OperationalError:
+        current_app.logger.exception("Erro ao buscar usuário para login")
+        db.session.rollback()
+        return jsonify({'error': 'Database unavailable. Please try again.'}), 500
     except SQLAlchemyError:
         current_app.logger.exception("Erro ao buscar usuário para login")
         db.session.rollback()

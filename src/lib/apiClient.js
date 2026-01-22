@@ -1,4 +1,5 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const DEFAULT_TIMEOUT_MS = 15000;
 
 class ApiClient {
   constructor() {
@@ -16,20 +17,25 @@ class ApiClient {
   }
 
   async request(endpoint, options = {}) {
+    const { timeoutMs = DEFAULT_TIMEOUT_MS, headers: customHeaders, ...fetchOptions } = options;
     const url = `${this.baseURL}${endpoint}`;
     const headers = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...customHeaders,
     };
 
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
       const response = await fetch(url, {
-        ...options,
+        ...fetchOptions,
         headers,
+        signal: controller.signal,
       });
 
       const data = await response.json().catch(() => ({}));
@@ -40,8 +46,16 @@ class ApiClient {
 
       return data;
     } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Tempo de resposta excedido. Tente novamente.');
+      }
+      if (error instanceof TypeError) {
+        throw new Error('Não foi possível conectar ao servidor. Tente novamente.');
+      }
       console.error('API Request Error:', error);
       throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 

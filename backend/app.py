@@ -3,7 +3,6 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO
 from config import Config
-from sqlalchemy.exc import OperationalError
 import time
 
 
@@ -17,7 +16,10 @@ def wait_for_db(max_tries=30, delay=2):
     from config import Config
     
     # Criar engine temporário para testar conexão
-    engine = create_engine(Config.SQLALCHEMY_DATABASE_URI)
+    engine = create_engine(
+        Config.SQLALCHEMY_DATABASE_URI,
+        **Config.SQLALCHEMY_ENGINE_OPTIONS
+    )
     
     for i in range(max_tries):
         try:
