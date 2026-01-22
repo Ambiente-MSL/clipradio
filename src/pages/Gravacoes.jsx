@@ -1434,6 +1434,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
   const [radios, setRadios] = useState([]);
   const [availableTags, setAvailableTags] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [stats, setStats] = useState({ totalGravacoes: 0, totalDuration: 0, totalSize: 0, uniqueRadios: 0 });
   const ITEMS_PER_PAGE = 10;
   const [listMeta, setListMeta] = useState({ page: 1, per_page: ITEMS_PER_PAGE, total: 0, total_pages: 0 });
@@ -1450,6 +1451,9 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
   const [currentPlayingId, setCurrentPlayingId] = useState(null);
   const [openTranscriptionId, setOpenTranscriptionId] = useState(null);
   const autoTranscriptionStartedRef = useRef(new Set());
+  const fetchIdRef = useRef(0);
+  const hasLoadedOnceRef = useRef(false);
+  const lastStatsKeyRef = useRef(null);
 
   useEffect(() => {
     const handleGlobalAudioClosed = () => setCurrentPlayingId(null);
@@ -1519,51 +1523,87 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
     }
   }, [toast]);
 
+  const fetchAgendamentos = useCallback(async () => {
+    try {
+      const data = await apiClient.getAgendamentos();
+      setAgendamentos(data || []);
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Erro ao buscar agendamentos', error);
+      }
+    }
+  }, []);
+
 
 
   const fetchGravacoes = useCallback(async () => {
+    const requestId = ++fetchIdRef.current;
+    if (!hasLoadedOnceRef.current) {
+      setLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
 
-    setLoading(true);
+    const statusFilter = activeTab === 'all' || activeTab === 'agendados' || activeTab === 'manuais'
+      ? 'concluido'
+      : undefined;
+    const tipoFilter = activeTab === 'agendados'
+      ? 'agendado'
+      : activeTab === 'manuais'
+        ? 'manual'
+        : undefined;
+    const statsKey = JSON.stringify({
+      radioId: filters.radioId,
+      data: filters.data,
+      cidade: filters.cidade,
+      estado: filters.estado,
+      status: statusFilter,
+      tipo: tipoFilter,
+    });
+    const shouldFetchStats = statsKey !== lastStatsKeyRef.current;
 
     try {
-      const statusFilter = activeTab === 'all' || activeTab === 'agendados' || activeTab === 'manuais'
-        ? 'concluido'
-        : undefined;
-      const tipoFilter = activeTab === 'agendados'
-        ? 'agendado'
-        : activeTab === 'manuais'
-          ? 'manual'
-          : undefined;
-      const [gravResp, agData] = await Promise.all([
-        apiClient.getGravacoes({
-          radioId: filters.radioId !== 'all' ? filters.radioId : undefined,
-          data: filters.data,
-          cidade: filters.cidade,
-          estado: filters.estado,
-          status: statusFilter,
-          tipo: tipoFilter,
-          page: currentPage,
-          perPage: ITEMS_PER_PAGE,
-          includeStats: true,
-        }),
-        apiClient.getAgendamentos().catch(() => []),
-      ]);
+      const gravResp = await apiClient.getGravacoes({
+        radioId: filters.radioId !== 'all' ? filters.radioId : undefined,
+        data: filters.data,
+        cidade: filters.cidade,
+        estado: filters.estado,
+        status: statusFilter,
+        tipo: tipoFilter,
+        page: currentPage,
+        perPage: ITEMS_PER_PAGE,
+        includeStats: shouldFetchStats,
+      });
+
+      if (requestId !== fetchIdRef.current) return;
 
       const gravList = gravResp?.items || [];
       const statsData = gravResp?.stats;
       const metaData = gravResp?.meta;
 
       setGravacoes(gravList || []);
-      setAgendamentos(agData || []);
-      setStats(statsData || { totalGravacoes: 0, totalDuration: 0, totalSize: 0, uniqueRadios: 0 });
+      if (statsData) {
+        setStats(statsData);
+        lastStatsKeyRef.current = statsKey;
+      }
       setListMeta(metaData || { page: currentPage, per_page: ITEMS_PER_PAGE, total: gravList.length, total_pages: gravList.length ? 1 : 0 });
       if (metaData?.page && metaData.page !== currentPage) {
         setCurrentPage(metaData.page);
       }
+      hasLoadedOnceRef.current = true;
     } catch (error) {
-      toast({ title: 'Erro ao buscar gravações', description: error.message, variant: 'destructive' });
+      if (requestId !== fetchIdRef.current) return;
+      if (!hasLoadedOnceRef.current) {
+        toast({ title: 'Erro ao buscar gravações', description: error.message, variant: 'destructive' });
+      } else if (process.env.NODE_ENV === 'development') {
+        console.error('Erro ao buscar gravações', error);
+      }
+    } finally {
+      if (requestId === fetchIdRef.current) {
+        setLoading(false);
+        setIsRefreshing(false);
+      }
     }
-    setLoading(false);
   }, [activeTab, currentPage, filters, toast]);
 
 
@@ -1576,6 +1616,13 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
   useEffect(() => {
     fetchTags();
   }, [fetchTags]);
+
+  useEffect(() => {
+    let timer;
+    fetchAgendamentos();
+    timer = setInterval(fetchAgendamentos, 60000);
+    return () => clearInterval(timer);
+  }, [fetchAgendamentos]);
 
   useEffect(() => {
     if (!filters.cidade) return;
@@ -1631,6 +1678,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
   }, [gravacoes]);
 
   useEffect(() => {
+    if (activeTab !== 'live') return;
     let timer;
     const fetchOngoing = async () => {
       setLoadingOngoing(true);
@@ -1648,12 +1696,13 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
     fetchOngoing();
     timer = setInterval(fetchOngoing, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [activeTab]);
 
   useEffect(() => {
+    if (activeTab !== 'live') return;
     const timer = setInterval(() => setLiveNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [activeTab]);
 
 
 
@@ -1927,7 +1976,13 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
       <span>
         Página {currentPage} de {totalPages} • {totalCount} gravações
       </span>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        {isRefreshing && (
+          <span className="flex items-center gap-2 text-xs text-slate-400">
+            <Loader className="w-3.5 h-3.5 animate-spin" />
+            Atualizando...
+          </span>
+        )}
         <Button
           size="icon"
           variant="ghost"

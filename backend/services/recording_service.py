@@ -178,10 +178,11 @@ def hydrate_gravacao_metadata(gravacao, *, autocommit=False):
         gravacao.tamanho_mb = size_mb
         changed = True
 
-    # Duração real
-    real_duration = _probe_duration_seconds(filepath)
-    if real_duration:
-        if (gravacao.duracao_segundos or 0) != real_duration:
+    # Duração real (evita ffprobe se já existe duração salva)
+    real_duration = None
+    if (gravacao.duracao_segundos or 0) <= 0:
+        real_duration = _probe_duration_seconds(filepath)
+        if real_duration:
             gravacao.duracao_segundos = real_duration
             gravacao.duracao_minutos = max(1, round(real_duration / 60))
             changed = True

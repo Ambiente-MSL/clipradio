@@ -4,6 +4,25 @@ import { useToast } from '@/components/ui/use-toast';
 
 const AuthContext = createContext(undefined);
 
+const loadCachedUser = () => {
+  try {
+    const cachedUserRaw = localStorage.getItem('auth_user');
+    if (!cachedUserRaw) return null;
+    return JSON.parse(cachedUserRaw);
+  } catch (error) {
+    localStorage.removeItem('auth_user');
+    return null;
+  }
+};
+
+const saveCachedUser = (user) => {
+  if (user) {
+    localStorage.setItem('auth_user', JSON.stringify(user));
+  } else {
+    localStorage.removeItem('auth_user');
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const { toast } = useToast();
 
@@ -14,6 +33,10 @@ export const AuthProvider = ({ children }) => {
     const getSession = async () => {
       try {
         const token = localStorage.getItem('auth_token');
+        const cachedUser = loadCachedUser();
+        if (cachedUser) {
+          setUser(cachedUser);
+        }
         if (!token) {
           setLoading(false);
           return;
@@ -21,10 +44,15 @@ export const AuthProvider = ({ children }) => {
 
         const userData = await apiClient.getMe();
         setUser(userData);
+        saveCachedUser(userData);
       } catch (err) {
-        console.error('Erro ao obter sessão:', err);
-        localStorage.removeItem('auth_token');
-        setUser(null);
+        console.error('Erro ao obter sess?o:', err);
+        const status = err?.status;
+        if (status === 401 || status === 403) {
+          localStorage.removeItem('auth_token');
+          saveCachedUser(null);
+          setUser(null);
+        }
       } finally {
         setLoading(false);
       }
@@ -37,12 +65,13 @@ export const AuthProvider = ({ children }) => {
     try {
       const data = await apiClient.register(email, password, nome);
       setUser(data.user);
+      saveCachedUser(data.user);
       return { error: null };
     } catch (error) {
       toast({
-        variant: "destructive",
-        title: "Falha no Cadastro",
-        description: error.message || "Algo deu errado. Tente novamente.",
+        variant: 'destructive',
+        title: 'Falha no Cadastro',
+        description: error.message || 'Algo deu errado. Tente novamente.',
       });
       return { error };
     }
@@ -52,13 +81,14 @@ export const AuthProvider = ({ children }) => {
     try {
       const data = await apiClient.login(email, password);
       setUser(data.user);
+      saveCachedUser(data.user);
       return { error: null };
     } catch (error) {
       console.error('Erro no login:', error);
       toast({
-        variant: "destructive",
-        title: "Falha no Login",
-        description: error.message || "Algo deu errado. Verifique suas credenciais.",
+        variant: 'destructive',
+        title: 'Falha no Login',
+        description: error.message || 'Algo deu errado. Verifique suas credenciais.',
       });
       return { error };
     }
@@ -68,11 +98,12 @@ export const AuthProvider = ({ children }) => {
     try {
       await apiClient.logout();
       setUser(null);
+      saveCachedUser(null);
     } catch (error) {
       toast({
-        variant: "destructive",
-        title: "Erro ao sair",
-        description: error.message || "Algo deu errado.",
+        variant: 'destructive',
+        title: 'Erro ao sair',
+        description: error.message || 'Algo deu errado.',
       });
     }
   }, [toast]);
@@ -96,4 +127,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
