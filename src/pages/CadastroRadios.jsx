@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Radio, Globe, Plus, Edit, Trash2, Star, StarOff, Loader, MapPin, Play, Pause, CheckCircle, AlertCircle, LayoutGrid, List, CircleDot, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Radio, Globe, Plus, Edit, Trash2, Star, StarOff, Loader, MapPin, Play, Pause, CheckCircle, AlertCircle, LayoutGrid, List, CircleDot, Clock, ChevronLeft, ChevronRight, Upload } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/SupabaseAuthContext'
@@ -9,6 +9,28 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+
+const extractStreamUrl = (text, extension) => {
+  const content = String(text || '')
+  const ext = String(extension || '').toLowerCase()
+
+  if (ext === 'pls') {
+    const fileLine = content.match(/^\s*file\d+\s*=\s*(.+)$/im)
+    if (fileLine && fileLine[1]) {
+      return fileLine[1].trim()
+    }
+  }
+
+  if (ext === 'asx') {
+    const hrefMatch = content.match(/<\s*ref\b[^>]*href\s*=\s*["']([^"']+)["']/i)
+    if (hrefMatch && hrefMatch[1]) {
+      return hrefMatch[1].trim()
+    }
+  }
+
+  const urlMatch = content.match(/https?:\/\/[^\s"'<>]+/i)
+  return urlMatch ? urlMatch[0].trim() : ''
+}
 
 const CadastroRadios = () => {
   const [radios, setRadios] = useState([])
@@ -49,6 +71,7 @@ const CadastroRadios = () => {
   const [activeRecordingId, setActiveRecordingId] = useState(null)
   const audioRef = useRef(null)
   const validationAudioRef = useRef(null)
+  const streamFileInputRef = useRef(null)
   const { toast } = useToast()
   const { user } = useAuth()
   const ITEMS_PER_PAGE = 10
@@ -165,6 +188,50 @@ const CadastroRadios = () => {
       cleanup()
     }
   }, [formData.stream_url])
+
+  const handleStreamFilePick = () => {
+    if (streamFileInputRef.current) {
+      streamFileInputRef.current.click()
+    }
+  }
+
+  const readFileText = (file) => {
+    if (file?.text) {
+      return file.text()
+    }
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result || '')
+      reader.onerror = () => reject(reader.error || new Error('Falha ao ler arquivo'))
+      reader.readAsText(file)
+    })
+  }
+
+  const handleStreamFileChange = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    const extension = (file.name.split('.').pop() || '').toLowerCase()
+    if (!['pls', 'asx'].includes(extension)) {
+      toast({ title: 'Arquivo inválido', description: 'Envie um arquivo .pls ou .asx.', variant: 'destructive' })
+      return
+    }
+
+    try {
+      const content = await readFileText(file)
+      const extracted = extractStreamUrl(content, extension)
+      if (!extracted) {
+        setStreamStatus({ state: 'error', message: 'Não foi possível extrair a URL do arquivo.' })
+        toast({ title: 'URL não encontrada', description: 'O arquivo não contém uma URL de stream válida.', variant: 'destructive' })
+        return
+      }
+      setFormData((prev) => ({ ...prev, stream_url: extracted }))
+      toast({ title: 'Arquivo carregado', description: 'URL do stream preenchida automaticamente.' })
+    } catch (error) {
+      toast({ title: 'Erro ao ler arquivo', description: error.message, variant: 'destructive' })
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -437,15 +504,32 @@ const CadastroRadios = () => {
                     <label className="block text-sm text-slate-400 mb-1">URL do Stream</label>
                     <div className="relative">
                       <Input
-                        className="pr-10"
+                        className="pl-10 pr-10"
                         value={formData.stream_url}
                         onChange={(e) => setFormData({ ...formData, stream_url: e.target.value })}
                         placeholder="https://stream.minharadio.com/stream"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleStreamFilePick}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                        title="Enviar arquivo .pls ou .asx"
+                        aria-label="Enviar arquivo .pls ou .asx"
+                      >
+                        <Upload className="w-4 h-4" />
+                      </button>
+                      <input
+                        ref={streamFileInputRef}
+                        type="file"
+                        accept=".pls,.asx"
+                        className="hidden"
+                        onChange={handleStreamFileChange}
                       />
                       <div className="absolute right-3 top-1/2 -translate-y-1/2">
                         {renderStreamStatusIcon()}
                       </div>
                     </div>
+                    <p className="text-xs text-slate-500 mt-1">Envie um arquivo .pls ou .asx para preencher a URL automaticamente.</p>
                     {streamStatus.state === 'error' && (
                       <p className="text-xs text-red-400 mt-1">{streamStatus.message}</p>
                     )}
