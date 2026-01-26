@@ -159,11 +159,12 @@ def _file_size_mb(filepath):
         return None
 
 
-def hydrate_gravacao_metadata(gravacao, *, autocommit=False):
+def hydrate_gravacao_metadata(gravacao, *, autocommit=False, check_files=True):
     """
     Garante que duração, tamanho e status estejam consistentes com o arquivo físico.
     - Lê o arquivo em disco (se existir) para preencher duracao_segundos/minutos e tamanho_mb.
     - Se o tempo previsto já passou e ainda está marcado como gravando/iniciando, marca como concluído.
+    - check_files=False evita I/O de disco/ffprobe (útil para listas/estatísticas).
     Retorna o objeto (já ajustado).
     """
     if not gravacao:
@@ -173,14 +174,15 @@ def hydrate_gravacao_metadata(gravacao, *, autocommit=False):
     filepath = _get_audio_filepath(gravacao)
 
     # Tamanho real
-    size_mb = _file_size_mb(filepath)
-    if size_mb is not None and (gravacao.tamanho_mb or 0) != size_mb:
-        gravacao.tamanho_mb = size_mb
-        changed = True
+    if check_files:
+        size_mb = _file_size_mb(filepath)
+        if size_mb is not None and (gravacao.tamanho_mb or 0) != size_mb:
+            gravacao.tamanho_mb = size_mb
+            changed = True
 
     # Duração real (evita ffprobe se já existe duração salva)
     real_duration = None
-    if (gravacao.duracao_segundos or 0) <= 0:
+    if check_files and (gravacao.duracao_segundos or 0) <= 0:
         real_duration = _probe_duration_seconds(filepath)
         if real_duration:
             gravacao.duracao_segundos = real_duration

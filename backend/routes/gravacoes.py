@@ -1,4 +1,6 @@
 from flask import Blueprint, request, jsonify
+import time
+from threading import Lock
 from app import db
 from models.gravacao import Gravacao
 from models.agendamento import Agendamento
@@ -8,10 +10,41 @@ from utils.jwt_utils import token_required, decode_token
 from flask import request as flask_request
 from datetime import datetime
 from sqlalchemy import and_, or_, desc
+from sqlalchemy.orm import selectinload, load_only
 from services.recording_service import hydrate_gravacao_metadata
 
 bp = Blueprint('gravacoes', __name__)
 MAX_PER_PAGE = 100
+STATS_CACHE_TTL_SECONDS = 30
+_STATS_CACHE = {}
+_STATS_CACHE_LOCK = Lock()
+
+GRAVACAO_LIST_FIELDS = (
+    Gravacao.id,
+    Gravacao.user_id,
+    Gravacao.radio_id,
+    Gravacao.status,
+    Gravacao.tipo,
+    Gravacao.arquivo_url,
+    Gravacao.arquivo_nome,
+    Gravacao.duracao_segundos,
+    Gravacao.duracao_minutos,
+    Gravacao.tamanho_mb,
+    Gravacao.batch_id,
+    Gravacao.criado_em,
+    Gravacao.atualizado_em,
+    Gravacao.transcricao_status,
+    Gravacao.transcricao_erro,
+    Gravacao.transcricao_idioma,
+    Gravacao.transcricao_modelo,
+    Gravacao.transcricao_progresso,
+    Gravacao.transcricao_cancelada,
+)
+RADIO_LIST_FIELDS = (
+    Radio.nome,
+    Radio.cidade,
+    Radio.estado,
+)
 
 def _parse_positive_int(value, default):
     try:
@@ -66,6 +99,21 @@ def _apply_gravacoes_filters(query, *, user_id, is_admin, radio_id=None, data_fi
             query = query.filter(db.func.upper(Radio.estado) == estado.upper())
 
     return query
+
+def _get_cached_stats(cache_key):
+    now = time.time()
+    with _STATS_CACHE_LOCK:
+        entry = _STATS_CACHE.get(cache_key)
+        if not entry:
+            return None
+        if now - entry["ts"] > STATS_CACHE_TTL_SECONDS:
+            _STATS_CACHE.pop(cache_key, None)
+            return None
+        return entry["value"]
+
+def _set_cached_stats(cache_key, value):
+    with _STATS_CACHE_LOCK:
+        _STATS_CACHE[cache_key] = {"ts": time.time(), "value": value}
 
 def get_user_ctx():
     token = flask_request.headers.get('Authorization', '').replace('Bearer ', '')
@@ -159,7 +207,10 @@ def get_gravacoes():
         page = total_pages
         offset = (page - 1) * per_page
 
-    gravacoes_query = base_query.order_by(Gravacao.criado_em.desc(), Gravacao.id.desc())
+    gravacoes_query = base_query.options(
+        load_only(*GRAVACAO_LIST_FIELDS),
+        selectinload(Gravacao.radio).load_only(*RADIO_LIST_FIELDS),
+    ).order_by(Gravacao.criado_em.desc(), Gravacao.id.desc())
     if cursor_dt:
         offset = 0
         page = 1
@@ -175,8 +226,15 @@ def get_gravacoes():
 
     gravacoes = gravacoes_query.offset(offset).limit(limit).all()
 
-    # Enriquecer metadados com dados reais do arquivo (duracao, tamanho, status)
-    gravacoes = [hydrate_gravacao_metadata(g, autocommit=True) for g in gravacoes]
+    # Enriquecer metadados apenas quando necessário para evitar I/O pesado em listas
+    for gravacao in gravacoes:
+        needs_check = (
+            gravacao.status in ("iniciando", "gravando", "processando")
+            or (gravacao.duracao_segundos or 0) <= 0
+            or (gravacao.tamanho_mb or 0) <= 0
+        )
+        if needs_check:
+            hydrate_gravacao_metadata(gravacao, autocommit=True, check_files=True)
 
     payload = [g.to_dict(include_radio=True) for g in gravacoes]
 
@@ -192,30 +250,50 @@ def get_gravacoes():
         meta['next_cursor_id'] = last_item.id
 
     if include_stats:
-        duration_expr = db.func.coalesce(Gravacao.duracao_segundos, Gravacao.duracao_minutos * 60)
-        stats_query = db.session.query(
-            db.func.coalesce(db.func.sum(duration_expr), 0),
-            db.func.coalesce(db.func.sum(Gravacao.tamanho_mb), 0),
-            db.func.count(db.distinct(Gravacao.radio_id)),
+        cache_key = (
+            "gravacoes_stats",
+            "admin" if is_admin else user_id,
+            radio_id,
+            data_filter,
+            cidade,
+            estado,
+            status,
+            tipo,
         )
-        stats_query = _apply_gravacoes_filters(
-            stats_query,
-            user_id=user_id,
-            is_admin=is_admin,
-            radio_id=radio_id,
-            data_filter=data_filter,
-            cidade=cidade,
-            estado=estado,
-            status=status,
-            tipo=tipo,
-        )
-        stats_row = stats_query.first() or (0, 0, 0)
-        stats = {
-            'totalGravacoes': total,
-            'totalDuration': int(stats_row[0] or 0),
-            'totalSize': float(stats_row[1] or 0),
-            'uniqueRadios': int(stats_row[2] or 0),
-        }
+        cached = _get_cached_stats(cache_key)
+        if cached:
+            stats = dict(cached)
+            stats["totalGravacoes"] = total
+        else:
+            duration_expr = db.func.coalesce(Gravacao.duracao_segundos, Gravacao.duracao_minutos * 60)
+            stats_query = db.session.query(
+                db.func.coalesce(db.func.sum(duration_expr), 0),
+                db.func.coalesce(db.func.sum(Gravacao.tamanho_mb), 0),
+                db.func.count(db.distinct(Gravacao.radio_id)),
+            )
+            stats_query = _apply_gravacoes_filters(
+                stats_query,
+                user_id=user_id,
+                is_admin=is_admin,
+                radio_id=radio_id,
+                data_filter=data_filter,
+                cidade=cidade,
+                estado=estado,
+                status=status,
+                tipo=tipo,
+            )
+            stats_row = stats_query.first() or (0, 0, 0)
+            stats = {
+                'totalGravacoes': total,
+                'totalDuration': int(stats_row[0] or 0),
+                'totalSize': float(stats_row[1] or 0),
+                'uniqueRadios': int(stats_row[2] or 0),
+            }
+            _set_cached_stats(cache_key, {
+                'totalDuration': stats['totalDuration'],
+                'totalSize': stats['totalSize'],
+                'uniqueRadios': stats['uniqueRadios'],
+            })
         return jsonify({'items': payload, 'stats': stats, 'meta': meta}), 200
 
     return jsonify({'items': payload, 'meta': meta}), 200
@@ -232,9 +310,11 @@ def get_ongoing():
     if not is_admin:
         query = query.filter_by(user_id=user_id)
 
-
-    gravacoes = query.order_by(Gravacao.criado_em.desc()).all()
-    gravacoes = [hydrate_gravacao_metadata(g, autocommit=True) for g in gravacoes]
+    gravacoes = query.options(
+        load_only(*GRAVACAO_LIST_FIELDS),
+        selectinload(Gravacao.radio).load_only(*RADIO_LIST_FIELDS),
+    ).order_by(Gravacao.criado_em.desc()).all()
+    gravacoes = [hydrate_gravacao_metadata(g, autocommit=True, check_files=False) for g in gravacoes]
     return jsonify([g.to_dict(include_radio=True) for g in gravacoes]), 200
 
 @bp.route('/<gravacao_id>', methods=['GET'])
@@ -248,7 +328,7 @@ def get_gravacao(gravacao_id):
         return jsonify({'error': 'Gravação não encontrada'}), 404
     if not is_admin and not _gravacao_access_allowed(gravacao, ctx):
         return jsonify({'error': 'Gravação não encontrada'}), 404
-    gravacao = hydrate_gravacao_metadata(gravacao, autocommit=True)
+    gravacao = hydrate_gravacao_metadata(gravacao, autocommit=True, check_files=True)
     return jsonify(gravacao.to_dict(include_radio=True)), 200
 
 
@@ -407,6 +487,11 @@ def admin_quick_stats():
     if not ctx.get('is_admin'):
         return jsonify({'error': 'Acesso negado'}), 403
 
+    cache_key = ("admin_quick_stats",)
+    cached = _get_cached_stats(cache_key)
+    if cached:
+        return jsonify(cached), 200
+
     # Base de gravações válidas (ignora erros)
     duration_expr = db.func.coalesce(Gravacao.duracao_segundos, Gravacao.duracao_minutos * 60)
     base_grav = Gravacao.query.filter(Gravacao.status != 'erro')
@@ -454,10 +539,12 @@ def admin_quick_stats():
                 'total_duration_seconds': int(top_radio_row.total_dur or 0),
             }
 
-    return jsonify({
+    payload = {
         'total_duration_seconds': int(total_duration_seconds),
         'total_duration_hours': round((total_duration_seconds or 0) / 3600, 2),
         'total_users': total_users,
         'top_scheduler': top_scheduler,
         'top_radio': top_radio,
-    }), 200
+    }
+    _set_cached_stats(cache_key, payload)
+    return jsonify(payload), 200

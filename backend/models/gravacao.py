@@ -2,6 +2,8 @@ from app import db
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import uuid
+from sqlalchemy import inspect
+from sqlalchemy.orm.attributes import NO_VALUE
 
 LOCAL_TZ = ZoneInfo("America/Fortaleza")
 
@@ -52,7 +54,20 @@ class Gravacao(db.Model):
         }
 
         data['transcricao_status'] = self.transcricao_status
-        data['transcricao_disponivel'] = bool(self.transcricao_texto)
+        transcricao_disponivel = None
+        if include_transcricao:
+            transcricao_disponivel = bool(self.transcricao_texto)
+        else:
+            try:
+                state = inspect(self)
+                loaded_value = state.attrs.transcricao_texto.loaded_value
+                if loaded_value is not NO_VALUE:
+                    transcricao_disponivel = bool(loaded_value)
+            except Exception:
+                transcricao_disponivel = None
+        if transcricao_disponivel is None:
+            transcricao_disponivel = self.transcricao_status == 'concluido'
+        data['transcricao_disponivel'] = transcricao_disponivel
         data['transcricao_erro'] = self.transcricao_erro
         data['transcricao_idioma'] = self.transcricao_idioma
         data['transcricao_modelo'] = self.transcricao_modelo
