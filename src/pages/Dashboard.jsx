@@ -45,7 +45,7 @@ const Dashboard = () => {
     try {
       const [radiosData, agendamentosData, gravacoesData] = await Promise.all([
         apiClient.getRadios(),
-        apiClient.getAgendamentos(),
+        apiClient.getAgendamentos({ status: 'agendado' }),
         apiClient.getGravacoes({ page: 1, perPage: 1 }),
       ]);
 

@@ -261,8 +261,12 @@ class ApiClient {
   }
 
   // ============ AGENDAMENTOS ============
-  async getAgendamentos() {
-    return this.request('/agendamentos');
+  async getAgendamentos(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+    if (filters.limit != null) params.append('limit', filters.limit);
+    const query = params.toString();
+    return this.request(`/agendamentos${query ? `?${query}` : ''}`);
   }
 
   async getAgendamento(id) {

@@ -40,7 +40,12 @@ def _sanitize_audio_mode(value):
 @bp.route('', methods=['GET'])
 @token_required
 def get_radios():
+    ctx = get_user_ctx()
+    user_id = ctx.get('user_id')
+    is_admin = ctx.get('is_admin', False)
     query = Radio.query
+    if not is_admin:
+        query = query.filter_by(user_id=user_id)
     radios = query.order_by(Radio.favorita.desc(), Radio.criado_em.desc()).all()
     return jsonify([radio.to_dict() for radio in radios]), 200
 

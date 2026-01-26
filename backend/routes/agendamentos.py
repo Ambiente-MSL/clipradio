@@ -12,6 +12,7 @@ import io
 from datetime import datetime as dt_mod
 from services.recording_service import validate_stream_url
 from services.scheduler_service import schedule_agendamento, unschedule_agendamento
+from sqlalchemy.orm import selectinload, load_only
 
 LOCAL_TZ = ZoneInfo("America/Fortaleza")
 
@@ -316,9 +317,24 @@ def get_agendamentos():
     ctx = get_user_ctx()
     user_id = ctx.get('user_id')
     is_admin = ctx.get('is_admin', False)
-    query = Agendamento.query
+    status = (request.args.get('status') or '').strip() or None
+    limit_arg = request.args.get('limit')
+
+    query = Agendamento.query.options(
+        selectinload(Agendamento.radio).load_only(Radio.nome)
+    )
     if not is_admin:
         query = query.filter_by(user_id=user_id)
+    if status:
+        query = query.filter(Agendamento.status == status)
+
+    if limit_arg is not None:
+        try:
+            limit = int(limit_arg)
+        except (TypeError, ValueError):
+            limit = None
+        if limit and limit > 0:
+            query = query.limit(limit)
     agendamentos = query.order_by(Agendamento.data_inicio.desc()).all()
     return jsonify([a.to_dict(include_radio=True) for a in agendamentos]), 200
 

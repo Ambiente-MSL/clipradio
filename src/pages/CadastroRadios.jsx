@@ -121,7 +121,7 @@ const CadastroRadios = () => {
     try {
       const [radiosData, agData] = await Promise.all([
         apiClient.getRadios(),
-        apiClient.getAgendamentos().catch(() => []),
+        apiClient.getAgendamentos({ status: 'agendado' }).catch(() => []),
       ])
       setRadios(radiosData || [])
       const agSet = new Set((agData || []).map((ag) => ag.radio_id))
