@@ -30,35 +30,51 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const getSession = async () => {
-      try {
-        const token = localStorage.getItem('auth_token');
-        const cachedUser = loadCachedUser();
-        if (cachedUser) {
-          setUser(cachedUser);
-        }
-        if (!token) {
-          setLoading(false);
-          return;
-        }
+    let cancelled = false;
 
+    const getSession = async () => {
+      const token = localStorage.getItem('auth_token');
+      const cachedUser = loadCachedUser();
+      const hasCachedUser = Boolean(cachedUser);
+
+      if (cachedUser) {
+        setUser(cachedUser);
+        setLoading(false);
+      }
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
         const userData = await apiClient.getMe();
+        if (cancelled) return;
         setUser(userData);
         saveCachedUser(userData);
       } catch (err) {
-        console.error('Erro ao obter sess?o:', err);
         const status = err?.status;
+        const isTransient = err?.code === 'TIMEOUT' || err?.code === 'NETWORK';
+        if (!isTransient) {
+          console.error('Erro ao obter sessao:', err);
+        }
         if (status === 401 || status === 403) {
           localStorage.removeItem('auth_token');
           saveCachedUser(null);
-          setUser(null);
+          if (!cancelled) {
+            setUser(null);
+          }
         }
       } finally {
-        setLoading(false);
+        if (!cancelled && !hasCachedUser) {
+          setLoading(false);
+        }
       }
     };
 
     getSession();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const signUp = useCallback(async (email, password, nome) => {

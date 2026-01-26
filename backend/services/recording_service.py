@@ -372,6 +372,8 @@ def start_recording(gravacao, *, duration_seconds=None, agendamento=None, block=
             '-nostdin',
             '-y',
         ]
+        if Config.FFMPEG_THREADS and Config.FFMPEG_THREADS > 0:
+            ffmpeg_cmd += ['-threads', str(Config.FFMPEG_THREADS)]
         if str(stream_url).lower().startswith(('http://', 'https://')):
             ffmpeg_cmd += [
                 '-reconnect',

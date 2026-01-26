@@ -1,5 +1,6 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-const DEFAULT_TIMEOUT_MS = 15000;
+const envTimeout = Number(import.meta.env.VITE_API_TIMEOUT_MS);
+const DEFAULT_TIMEOUT_MS = Number.isFinite(envTimeout) && envTimeout > 0 ? envTimeout : 25000;
 
 class ApiClient {
   constructor() {
@@ -29,7 +30,17 @@ class ApiClient {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    let timeoutId = null;
+    const resolvedTimeoutMs = Number.isFinite(Number(timeoutMs)) && Number(timeoutMs) > 0
+      ? Number(timeoutMs)
+      : DEFAULT_TIMEOUT_MS;
+    const clearRequestTimeout = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
+    timeoutId = setTimeout(() => controller.abort(), resolvedTimeoutMs);
 
     try {
       const response = await fetch(url, {
@@ -38,6 +49,7 @@ class ApiClient {
         signal: controller.signal,
       });
 
+      clearRequestTimeout();
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
@@ -49,16 +61,20 @@ class ApiClient {
 
       return data;
     } catch (error) {
-      if (error.name === 'AbortError') {
-        throw new Error('Tempo de resposta excedido. Tente novamente.');
+      if (error?.name === 'AbortError' || error?.code === 20) {
+        const err = new Error('Tempo de resposta excedido. Tente novamente.');
+        err.code = 'TIMEOUT';
+        throw err;
       }
       if (error instanceof TypeError) {
-        throw new Error('Não foi possível conectar ao servidor. Tente novamente.');
+        const err = new Error('Nao foi possivel conectar ao servidor. Tente novamente.');
+        err.code = 'NETWORK';
+        throw err;
       }
       console.error('API Request Error:', error);
       throw error;
     } finally {
-      clearTimeout(timeoutId);
+      clearRequestTimeout();
     }
   }
 
