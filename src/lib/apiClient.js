@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { API_URL, WS_BASE_URL } from '@/lib/apiConfig';
 const envTimeout = Number(import.meta.env.VITE_API_TIMEOUT_MS);
 const DEFAULT_TIMEOUT_MS = Number.isFinite(envTimeout) && envTimeout > 0 ? envTimeout : 25000;
 
@@ -400,7 +400,7 @@ class ApiClient {
     // Requer instalação: npm install socket.io-client
     try {
       const { io } = require('socket.io-client');
-      const wsUrl = API_URL.replace('/api', '').replace('http', 'ws');
+      const wsUrl = WS_BASE_URL || API_URL.replace('/api', '').replace('http', 'ws');
       const socket = io(wsUrl);
       
       socket.on('connect', () => {

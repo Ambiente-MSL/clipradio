@@ -6,7 +6,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
-from flask import current_app
+from flask import current_app, has_app_context
 
 from app import db
 from config import Config
@@ -37,6 +37,21 @@ def _capture_scheduler_app(app=None):
     except Exception:
         pass
     return _scheduler_app
+
+
+def _safe_session_remove(app_obj=None):
+    """Remove session com contexto ativo, evitando RuntimeError fora de app context."""
+    try:
+        if has_app_context():
+            db.session.remove()
+            return
+        if app_obj is None:
+            app_obj = _capture_scheduler_app()
+        if app_obj:
+            with app_obj.app_context():
+                db.session.remove()
+    except Exception:
+        pass
 
 def init_scheduler(app=None):
     """Inicializa o agendador e recarrega agendamentos ativos."""
@@ -125,7 +140,7 @@ def cleanup_local_audio_archived():
         except Exception:
             pass
     finally:
-        db.session.remove()
+        _safe_session_remove(app_obj)
 
 
 def _normalized_run_date(dt):
@@ -234,7 +249,7 @@ def cleanup_agendamentos_stuck():
         except Exception:
             pass
     finally:
-        db.session.remove()
+        _safe_session_remove(app_obj)
 
 
 def unschedule_agendamento(agendamento_id):

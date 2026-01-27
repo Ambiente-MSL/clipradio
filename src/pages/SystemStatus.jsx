@@ -5,8 +5,7 @@ import { Loader2, Server, ShieldCheck, ShieldOff } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+import { API_URL } from "@/lib/apiConfig";
 
 const StatusIndicator = ({ status }) => {
   if (status === "loading") {

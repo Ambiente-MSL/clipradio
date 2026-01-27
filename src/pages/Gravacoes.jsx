@@ -5,6 +5,7 @@ import { jsPDF } from 'jspdf';
 import { motion } from 'framer-motion';
 
 import apiClient from '@/lib/apiClient';
+import { API_ORIGIN } from '@/lib/apiConfig';
 
 import { useToast } from '@/components/ui/use-toast';
 import { Helmet } from 'react-helmet';
@@ -15,9 +16,6 @@ import { Play, Pause, Download, Trash2, Clock, FileArchive, FileText, Mic, Filte
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-const API_ORIGIN = API_URL.replace(/\/api\/?$/, '');
 
 const resolveFileUrl = (url, filename) => {
   if (url) {
