@@ -7,7 +7,7 @@ from typing import Dict
 
 import requests
 
-from flask import current_app
+from flask import current_app, has_app_context
 from app import db
 from config import Config
 from models.gravacao import Gravacao
@@ -20,6 +20,18 @@ ALLOWED_BITRATES = {96, 128}
 ALLOWED_FORMATS = {'mp3', 'opus'}
 ALLOWED_AUDIO_MODES = {'mono', 'stereo'}
 ACTIVE_PROCESSES: Dict[str, subprocess.Popen] = {}
+
+def _safe_session_remove(app_obj=None):
+    """Fecha a sessão do SQLAlchemy com contexto ativo."""
+    try:
+        if has_app_context():
+            db.session.remove()
+            return
+        if app_obj is not None:
+            with app_obj.app_context():
+                db.session.remove()
+    except Exception:
+        pass
 
 
 def _validate_stream_url_http(stream_url, timeout_seconds):
@@ -472,6 +484,7 @@ def start_recording(gravacao, *, duration_seconds=None, agendamento=None, block=
             ACTIVE_PROCESSES.pop(gravacao.id, None)
             if ctx:
                 ctx.pop()
+            _safe_session_remove(app_obj)
 
     if block:
         wait_and_finalize()

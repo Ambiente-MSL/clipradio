@@ -5,7 +5,7 @@ import subprocess
 import threading
 from collections import Counter
 
-from flask import current_app
+from flask import current_app, has_app_context
 
 from app import db
 from config import Config
@@ -22,6 +22,18 @@ _TRANSCRIBE_IN_FLIGHT = Counter()
 _TRANSCRIBE_IN_FLIGHT_LOCK = threading.Lock()
 _TRANSCRIBE_ACTIVE = 0
 _TRANSCRIBE_ACTIVE_LOCK = threading.Lock()
+
+def _safe_session_remove(app_obj=None):
+    """Fecha a sessão do SQLAlchemy com contexto ativo."""
+    try:
+        if has_app_context():
+            db.session.remove()
+            return
+        if app_obj is not None:
+            with app_obj.app_context():
+                db.session.remove()
+    except Exception:
+        pass
 
 
 def _get_transcribe_max_workers():
@@ -77,6 +89,7 @@ def _transcribe_worker():
         finally:
             if ctx:
                 ctx.pop()
+            _safe_session_remove(app_obj)
             with _TRANSCRIBE_ACTIVE_LOCK:
                 _TRANSCRIBE_ACTIVE = max(0, _TRANSCRIBE_ACTIVE - 1)
             with _TRANSCRIBE_IN_FLIGHT_LOCK:
