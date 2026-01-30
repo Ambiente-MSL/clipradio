@@ -539,6 +539,27 @@ def move_file(
     return resp.json()
 
 
+def delete_file(
+    path: str,
+    *,
+    token: Optional[str] = None,
+    timeout: Tuple[int, int] = (10, 30),
+) -> dict:
+    cfg = get_dropbox_config()
+    token = token or cfg.access_token
+    if not token:
+        raise DropboxError("DROPBOX_ACCESS_TOKEN nÇœo configurado")
+
+    resp = requests.post(
+        f"{DROPBOX_API_BASE}/files/delete_v2",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json={"path": path},
+        timeout=timeout,
+    )
+    _raise_for_response(resp, action="delete")
+    return resp.json()
+
+
 def _ensure_folder(path: str, *, token: str, timeout: Tuple[int, int] = (10, 30)) -> None:
     normalized = str(path or "").strip()
     if not normalized or normalized == "/":

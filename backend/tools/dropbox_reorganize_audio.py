@@ -1,8 +1,10 @@
-import csv
 import argparse
+import csv
 import os
 import posixpath
+import re
 import sys
+import time
 from datetime import datetime
 from types import SimpleNamespace
 
@@ -14,12 +16,36 @@ from services.dropbox_service import (
     DropboxError,
     build_audio_destination,
     build_remote_audio_path,
+    delete_file,
     ensure_folder,
     get_audio_id_from_filename,
     get_dropbox_config,
     list_folder_entries,
     move_file,
 )
+
+_STATUS_RE = re.compile(r"status=(\d+)")
+_RETRY_AFTER_RE = re.compile(r"retry_after[\"']?\s*[:=]\s*(\d+)", re.IGNORECASE)
+
+
+def _extract_status_code(exc: Exception):
+    match = _STATUS_RE.search(str(exc))
+    if match:
+        try:
+            return int(match.group(1))
+        except ValueError:
+            return None
+    return None
+
+
+def _extract_retry_after(exc: Exception):
+    match = _RETRY_AFTER_RE.search(str(exc))
+    if match:
+        try:
+            return int(match.group(1))
+        except ValueError:
+            return None
+    return None
 
 
 def parse_datetime(value):
@@ -119,6 +145,27 @@ def main() -> int:
         help="Salva um CSV com id, old_name, new_name, new_path.",
     )
     parser.add_argument(
+        "--unrecognized-path",
+        help="Move arquivos sem metadata para essa pasta (ex: /clipradio/audio/_NAO_RECONHECIDO).",
+    )
+    parser.add_argument(
+        "--delete-source-on-conflict",
+        action="store_true",
+        help="Remove arquivo de origem quando o destino ja existe (duplicado).",
+    )
+    parser.add_argument(
+        "--max-retries",
+        type=int,
+        default=3,
+        help="Numero maximo de tentativas em caso de rate limit (default: 3).",
+    )
+    parser.add_argument(
+        "--retry-wait",
+        type=int,
+        default=10,
+        help="Aguarde N segundos quando houver rate limit e retry_after ausente (default: 10).",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="So imprime o que faria, sem mover arquivos.",
@@ -152,6 +199,7 @@ def main() -> int:
     moved = 0
     skipped = 0
     failed = 0
+    deleted_duplicates = 0
     output_rows = []
 
     for entry in entries:
@@ -169,27 +217,30 @@ def main() -> int:
 
         if layout == "hierarchy":
             if not meta:
-                skipped += 1
-                continue
-
-            gravacao = SimpleNamespace(
-                id=meta.get("id") or get_audio_id_from_filename(filename) or filename,
-                criado_em=meta.get("criado_em"),
-                arquivo_nome=meta.get("arquivo_nome") or filename,
-                arquivo_url=meta.get("arquivo_url"),
-            )
-            radio = SimpleNamespace(
-                nome=meta.get("radio_nome"),
-                cidade=meta.get("cidade"),
-                estado=meta.get("estado"),
-            )
-            desired_path, desired_name = build_audio_destination(
-                gravacao,
-                radio=radio,
-                original_filename=filename,
-                base_path=base_path,
-                layout=layout,
-            )
+                if not args.unrecognized_path:
+                    skipped += 1
+                    continue
+                desired_name = filename
+                desired_path = posixpath.join(args.unrecognized_path.rstrip("/"), desired_name)
+            else:
+                gravacao = SimpleNamespace(
+                    id=meta.get("id") or get_audio_id_from_filename(filename) or filename,
+                    criado_em=meta.get("criado_em"),
+                    arquivo_nome=meta.get("arquivo_nome") or filename,
+                    arquivo_url=meta.get("arquivo_url"),
+                )
+                radio = SimpleNamespace(
+                    nome=meta.get("radio_nome"),
+                    cidade=meta.get("cidade"),
+                    estado=meta.get("estado"),
+                )
+                desired_path, desired_name = build_audio_destination(
+                    gravacao,
+                    radio=radio,
+                    original_filename=filename,
+                    base_path=base_path,
+                    layout=layout,
+                )
         else:
             desired_name = filename
             desired_path = build_remote_audio_path(filename, base_path=base_path, layout=layout)
@@ -210,16 +261,35 @@ def main() -> int:
             moved += 1
             continue
 
-        try:
-            ensure_folder(posixpath.dirname(desired_path), token=cfg.access_token)
-            move_file(current_path, desired_path, token=cfg.access_token, autorename=False)
-            moved += 1
-        except DropboxError as exc:
-            failed += 1
-            print(f"Falha ao mover {current_path}: {exc}")
-        except Exception as exc:
-            failed += 1
-            print(f"Erro inesperado ao mover {current_path}: {exc}")
+        attempts = max(1, int(args.max_retries or 1))
+        for attempt in range(1, attempts + 1):
+            try:
+                ensure_folder(posixpath.dirname(desired_path), token=cfg.access_token)
+                move_file(current_path, desired_path, token=cfg.access_token, autorename=False)
+                moved += 1
+                break
+            except DropboxError as exc:
+                status = _extract_status_code(exc)
+                if status == 409 and args.delete_source_on_conflict:
+                    try:
+                        delete_file(current_path, token=cfg.access_token)
+                        deleted_duplicates += 1
+                    except Exception as delete_exc:
+                        failed += 1
+                        print(f"Falha ao remover duplicado {current_path}: {delete_exc}")
+                    break
+                if status == 429 and attempt < attempts:
+                    wait_time = _extract_retry_after(exc) or int(args.retry_wait or 10)
+                    print(f"Rate limit; aguardando {wait_time}s (tentativa {attempt}/{attempts})")
+                    time.sleep(max(1, wait_time))
+                    continue
+                failed += 1
+                print(f"Falha ao mover {current_path}: {exc}")
+                break
+            except Exception as exc:
+                failed += 1
+                print(f"Erro inesperado ao mover {current_path}: {exc}")
+                break
 
     if args.output_csv and output_rows:
         try:
@@ -230,7 +300,11 @@ def main() -> int:
         except Exception as exc:
             print(f"Falha ao salvar output CSV: {exc}")
 
-    print(f"Concluido. Movidos: {moved}, Ignorados: {skipped}, Falhas: {failed}")
+    print(
+        "Concluido. "
+        f"Movidos: {moved}, Ignorados: {skipped}, "
+        f"Duplicados removidos: {deleted_duplicates}, Falhas: {failed}"
+    )
     return 0 if failed == 0 else 1
 
 
