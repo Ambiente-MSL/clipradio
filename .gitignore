@@ -36,10 +36,8 @@ docker-compose.override.yml
 EOF
 
 # Claude
-.claude/*
 /.claude
 .claude
-.claude/
 
 # MD
 *.md
