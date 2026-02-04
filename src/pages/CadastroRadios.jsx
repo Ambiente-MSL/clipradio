@@ -72,6 +72,8 @@ const CadastroRadios = () => {
   const audioRef = useRef(null)
   const validationAudioRef = useRef(null)
   const streamFileInputRef = useRef(null)
+  const playAttemptRef = useRef(0)
+  const playErrorTimeoutRef = useRef(null)
   const { toast } = useToast()
   const { user } = useAuth()
   const ITEMS_PER_PAGE = 10
@@ -108,13 +110,37 @@ const CadastroRadios = () => {
       return 'Este stream não é compatível com o navegador. Confira o formato ou use outra URL.'
     }
     if (name === 'aborterror' || message.includes('interrupted by a call to pause') || message.includes('interrupted')) {
-      return 'A reprodução foi interrompida. Tente novamente.'
+      return ''
     }
     if (message.includes('failed to fetch') || message.includes('network') || message.includes('404') || message.includes('not found')) {
       return 'Não foi possível conectar ao stream. Verifique a URL e tente novamente.'
     }
     return 'Não foi possível reproduzir este stream agora. Verifique a URL ou tente novamente.'
   }
+
+  const clearPlaybackErrorTimeout = useCallback(() => {
+    if (playErrorTimeoutRef.current) {
+      clearTimeout(playErrorTimeoutRef.current)
+      playErrorTimeoutRef.current = null
+    }
+  }, [])
+
+  const queuePlaybackError = useCallback((message, attemptId) => {
+    if (!message) return
+    clearPlaybackErrorTimeout()
+    playErrorTimeoutRef.current = setTimeout(() => {
+      if (playAttemptRef.current !== attemptId) return
+      const audio = audioRef.current
+      if (audio && !audio.paused) return
+      setIsBuffering(false)
+      setCurrentRadioId(null)
+      toast({
+        title: 'Não foi possível reproduzir',
+        description: message,
+        variant: 'destructive',
+      })
+    }, 800)
+  }, [clearPlaybackErrorTimeout, toast])
 
   const fetchRadios = useCallback(async () => {
     setLoading(true)
@@ -326,16 +352,14 @@ const CadastroRadios = () => {
     audioRef.current = new Audio()
     const audio = audioRef.current
 
-    const handlePlay = () => setIsBuffering(false)
+    const handlePlay = () => {
+      clearPlaybackErrorTimeout()
+      setIsBuffering(false)
+    }
     const handleWaiting = () => setIsBuffering(true)
     const handleError = () => {
-      setIsBuffering(false)
-      toast({
-        title: 'Não foi possível reproduzir',
-        description: 'Não foi possível carregar o stream da rádio. Verifique a URL ou tente novamente.',
-        variant: 'destructive',
-      })
-      setCurrentRadioId(null)
+      if (!audio.src) return
+      queuePlaybackError('Não foi possível carregar o stream da rádio. Verifique a URL ou tente novamente.', playAttemptRef.current)
     }
 
     audio.addEventListener('play', handlePlay)
@@ -344,13 +368,14 @@ const CadastroRadios = () => {
     audio.addEventListener('error', handleError)
 
     return () => {
+      clearPlaybackErrorTimeout()
       audio.pause()
       audio.removeEventListener('play', handlePlay)
       audio.removeEventListener('waiting', handleWaiting)
       audio.removeEventListener('canplay', handlePlay)
       audio.removeEventListener('error', handleError)
     }
-  }, [toast])
+  }, [clearPlaybackErrorTimeout, queuePlaybackError])
 
   const handlePlayPause = useCallback(
     async (radio) => {
@@ -361,27 +386,31 @@ const CadastroRadios = () => {
         audio.pause()
         setCurrentRadioId(null)
         setIsBuffering(false)
+        clearPlaybackErrorTimeout()
         return
       }
 
+      const attemptId = playAttemptRef.current + 1
+      playAttemptRef.current = attemptId
+      clearPlaybackErrorTimeout()
+      setIsBuffering(true)
+      setCurrentRadioId(radio.id)
+
       try {
-        setIsBuffering(true)
         audio.pause()
         audio.src = radio.stream_url
         audio.load()
         await audio.play()
+        if (playAttemptRef.current !== attemptId) return
         setCurrentRadioId(radio.id)
       } catch (err) {
-        setIsBuffering(false)
-        toast({
-          title: 'Não foi possível reproduzir',
-          description: getPlaybackErrorMessage(err),
-          variant: 'destructive',
-        })
-        setCurrentRadioId(null)
+        if (playAttemptRef.current !== attemptId) return
+        const message = getPlaybackErrorMessage(err)
+        if (!message) return
+        queuePlaybackError(message, attemptId)
       }
     },
-    [currentRadioId, toast]
+    [clearPlaybackErrorTimeout, currentRadioId, getPlaybackErrorMessage, queuePlaybackError]
   )
 
   const isPlaying = (id) => currentRadioId === id && audioRef.current && !audioRef.current.paused
