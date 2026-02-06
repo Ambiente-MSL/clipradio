@@ -76,6 +76,20 @@ def create_app():
     app.register_blueprint(recording.bp, url_prefix='/api/recording')
     app.register_blueprint(files.bp, url_prefix='/api/files')
     app.register_blueprint(admin.bp, url_prefix='/api/admin')
+
+    @app.teardown_appcontext
+    def shutdown_session(exception=None):
+        """Garante liberação de conexões do pool ao final do contexto."""
+        try:
+            if exception:
+                db.session.rollback()
+        except Exception:
+            pass
+        finally:
+            try:
+                db.session.remove()
+            except Exception:
+                pass
     
     @app.route('/api/health')
     def health():

@@ -57,6 +57,12 @@ def get_audio(filename):
 
         seen = set()
         candidates = [path for path in candidates if not (path in seen or seen.add(path))]
+
+        # Libera a conexao do pool antes de iniciar streaming (pode durar minutos).
+        try:
+            db.session.remove()
+        except Exception:
+            pass
         for remote_path in candidates:
             resp = download_response(remote_path, token=dropbox_cfg.access_token, range_header=range_header)
             if resp.status_code in (404, 409):
