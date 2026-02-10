@@ -381,7 +381,7 @@ class ApiClient {
   }
 
   async getOngoingRecordings() {
-    return this.request('/gravacoes/ongoing');
+    return this.request('/gravacoes/ongoing', { timeoutMs: 10000 });
   }
 
   async processAudioWithAI(gravacaoId, palavrasChave) {

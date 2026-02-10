@@ -1677,11 +1677,16 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
   useEffect(() => {
     if (activeTab !== 'live') return;
-    let timer;
+    let cancelled = false;
+    let inFlight = false;
+    let timer = null;
     const fetchOngoing = async () => {
+      if (cancelled || inFlight) return;
+      inFlight = true;
       setLoadingOngoing(true);
       try {
         const data = await apiClient.getOngoingRecordings();
+        if (cancelled) return;
         setOngoingLive(data || []);
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
@@ -1689,11 +1694,17 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
         }
       } finally {
         setLoadingOngoing(false);
+        inFlight = false;
+        if (!cancelled) {
+          timer = setTimeout(fetchOngoing, 5000);
+        }
       }
     };
     fetchOngoing();
-    timer = setInterval(fetchOngoing, 5000);
-    return () => clearInterval(timer);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [activeTab]);
 
   useEffect(() => {

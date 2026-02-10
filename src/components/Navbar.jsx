@@ -142,7 +142,12 @@ const Navbar = () => {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
+    let inFlight = false;
+    let timer = null;
+
     const fetchOngoing = async () => {
+      if (cancelled || inFlight) return;
+      inFlight = true;
       try {
         const data = await apiClient.getOngoingRecordings();
         if (cancelled) return;
@@ -150,13 +155,18 @@ const Navbar = () => {
         setOngoingRecords((prev) => mergeOngoingRecords(prev, normalized, Date.now()));
       } catch (error) {
         // Ignore polling errors to keep the navbar responsive.
+      } finally {
+        inFlight = false;
+        if (!cancelled) {
+          timer = setTimeout(fetchOngoing, 5000);
+        }
       }
     };
+
     fetchOngoing();
-    const interval = setInterval(fetchOngoing, 5000);
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      if (timer) clearTimeout(timer);
     };
   }, [user]);
 

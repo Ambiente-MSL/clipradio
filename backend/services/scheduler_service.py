@@ -58,6 +58,7 @@ def init_scheduler(app=None):
     _capture_scheduler_app(app)
     if not scheduler.running:
         scheduler.start()
+    app_obj = None
     try:
         app_obj = _capture_scheduler_app()
         if not app_obj:
@@ -84,6 +85,8 @@ def init_scheduler(app=None):
                 )
     except Exception as e:
         print(f"Erro ao carregar agendamentos: {e}")
+    finally:
+        _safe_session_remove(app_obj)
 
 
 def cleanup_local_audio_archived():
@@ -311,70 +314,82 @@ def execute_agendamento(agendamento_id):
         print(f"Erro: Flask app indisponível para executar agendamento {agendamento_id}")
         return
 
-    with app_obj.app_context():
-        agendamento = Agendamento.query.get(agendamento_id)
-        if not agendamento or agendamento.status != 'agendado':
-            return
-
-        if Config.STREAM_VALIDATE_ON_EXECUTE:
-            radio = Radio.query.get(agendamento.radio_id)
-            if not radio or not radio.stream_url:
-                agendamento.status = 'erro'
-                db.session.commit()
-                broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
-                unschedule_agendamento(agendamento.id)
+    try:
+        with app_obj.app_context():
+            agendamento = Agendamento.query.get(agendamento_id)
+            if not agendamento or agendamento.status != 'agendado':
                 return
-            ok, reason = validate_stream_url(
-                radio.stream_url,
-                timeout_seconds=Config.STREAM_VALIDATE_TIMEOUT_SECONDS,
+
+            if Config.STREAM_VALIDATE_ON_EXECUTE:
+                radio = Radio.query.get(agendamento.radio_id)
+                if not radio or not radio.stream_url:
+                    agendamento.status = 'erro'
+                    db.session.commit()
+                    broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
+                    unschedule_agendamento(agendamento.id)
+                    return
+                ok, reason = validate_stream_url(
+                    radio.stream_url,
+                    timeout_seconds=Config.STREAM_VALIDATE_TIMEOUT_SECONDS,
+                )
+                if not ok:
+                    agendamento.status = 'erro'
+                    db.session.commit()
+                    broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
+                    try:
+                        current_app.logger.error(
+                            f"Agendamento {agendamento.id} falhou ao validar stream: {reason}"
+                        )
+                    except Exception:
+                        pass
+                    unschedule_agendamento(agendamento.id)
+                    return
+
+            gravacao = Gravacao(
+                user_id=agendamento.user_id,
+                radio_id=agendamento.radio_id,
+                status='iniciando',
+                tipo='agendado',
+                duracao_minutos=agendamento.duracao_minutos,
             )
-            if not ok:
+            db.session.add(gravacao)
+            db.session.commit()
+
+            agendamento.status = 'em_execucao'
+            db.session.commit()
+            broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
+
+            next_status = _next_status_after_run(agendamento)
+            try:
+                # Bloqueia até terminar; recording_service finaliza status e atualiza gravação/arquivo
+                start_recording(
+                    gravacao,
+                    duration_seconds=agendamento.duracao_minutos * 60,
+                    agendamento=agendamento,
+                    block=True,
+                )
+            except Exception:
                 agendamento.status = 'erro'
+                gravacao.status = 'erro'
                 db.session.commit()
                 broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
-                try:
-                    current_app.logger.error(
-                        f"Agendamento {agendamento.id} falhou ao validar stream: {reason}"
-                    )
-                except Exception:
-                    pass
+                broadcast_update(f"user_{agendamento.user_id}", "gravacao_updated", gravacao.to_dict())
+            # Fallback para nao ficar travado em "em_execucao"/"Gravando"
+            if agendamento.status == 'em_execucao':
+                agendamento.status = next_status
+                db.session.commit()
+                broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
+
+            if agendamento.tipo_recorrencia == 'none':
                 unschedule_agendamento(agendamento.id)
-                return
-
-        gravacao = Gravacao(
-            user_id=agendamento.user_id,
-            radio_id=agendamento.radio_id,
-            status='iniciando',
-            tipo='agendado',
-            duracao_minutos=agendamento.duracao_minutos,
-        )
-        db.session.add(gravacao)
-        db.session.commit()
-
-        agendamento.status = 'em_execucao'
-        db.session.commit()
-        broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
-
-        next_status = _next_status_after_run(agendamento)
+    except Exception as e:
         try:
-            # Bloqueia até terminar; recording_service finaliza status e atualiza gravação/arquivo
-            start_recording(
-                gravacao,
-                duration_seconds=agendamento.duracao_minutos * 60,
-                agendamento=agendamento,
-                block=True,
-            )
+            db.session.rollback()
         except Exception:
-            agendamento.status = 'erro'
-            gravacao.status = 'erro'
-            db.session.commit()
-            broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
-            broadcast_update(f"user_{agendamento.user_id}", "gravacao_updated", gravacao.to_dict())
-        # Fallback para nao ficar travado em "em_execucao"/"Gravando"
-        if agendamento.status == 'em_execucao':
-            agendamento.status = next_status
-            db.session.commit()
-            broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
-
-        if agendamento.tipo_recorrencia == 'none':
-            unschedule_agendamento(agendamento.id)
+            pass
+        try:
+            current_app.logger.exception(f"Erro ao executar agendamento {agendamento_id}: {e}")
+        except Exception:
+            pass
+    finally:
+        _safe_session_remove(app_obj)
