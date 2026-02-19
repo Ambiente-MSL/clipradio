@@ -93,15 +93,34 @@ def create_app():
     
     @app.route('/api/health')
     def health():
+        db_status = 'disconnected'
+        scheduler_status = 'unknown'
+
         try:
-            # Testar conexao com banco
+            # Verifica se banco responde consultas simples
             db.session.execute(db.text('SELECT 1'))
-            # Validar se a tabela de usuarios estДЃ acessГ­vel (evita 500 silenciosos)
             db.session.execute(db.text('SELECT 1 FROM usuarios LIMIT 1'))
-            return jsonify({'status': 'ok', 'database': 'connected'})
+            db_status = 'connected'
+
+            from services.scheduler_service import scheduler
+
+            scheduler_status = 'running' if scheduler.running else 'stopped'
+            if scheduler_status != 'running':
+                raise RuntimeError("scheduler not running")
+
+            return jsonify({
+                'status': 'ok',
+                'database': db_status,
+                'scheduler': scheduler_status,
+            })
         except Exception as e:
             app.logger.exception("Health check falhou")
-            return jsonify({'status': 'error', 'database': 'disconnected', 'error': str(e)}), 500
+            return jsonify({
+                'status': 'error',
+                'database': db_status,
+                'scheduler': scheduler_status,
+                'error': str(e),
+            }), 500
     
     # Inicializar scheduler (aguardar banco estar pronto)
     from services.scheduler_service import init_scheduler
