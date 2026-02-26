@@ -240,8 +240,8 @@ def _finalizar_gravacao(gravacao, status, filepath=None, duration_seconds=None, 
 
     gravacao.status = status
     if agendamento:
-        # Recorrentes voltam para 'agendado' após concluir; Únicos ficam 'concluido'
-        if status == 'concluido' and getattr(agendamento, 'tipo_recorrencia', 'none') != 'none':
+        # Mantém recorrentes ativos mesmo em falhas pontuais.
+        if getattr(agendamento, 'tipo_recorrencia', 'none') != 'none':
             agendamento.status = 'agendado'
         else:
             agendamento.status = status if status in ('concluido', 'erro') else agendamento.status

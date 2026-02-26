@@ -19,7 +19,7 @@ from services.websocket_service import broadcast_update
 LOCAL_TZ = ZoneInfo("America/Fortaleza")
 scheduler = BackgroundScheduler(
     timezone=LOCAL_TZ,
-    job_defaults={"misfire_grace_time": 60, "coalesce": True, "max_instances": 1},
+    job_defaults={"misfire_grace_time": 300, "coalesce": True, "max_instances": 1},
 )
 _scheduler_app = None
 
@@ -308,10 +308,10 @@ def schedule_agendamento(agendamento):
 
 
 def execute_agendamento(agendamento_id):
-    """Executa um agendamento e controla status/gravação."""
+    """Executa um agendamento e controla status/gravacao."""
     app_obj = _capture_scheduler_app()
     if not app_obj:
-        print(f"Erro: Flask app indisponível para executar agendamento {agendamento_id}")
+        print(f"Erro: Flask app indisponivel para executar agendamento {agendamento_id}")
         return
 
     try:
@@ -320,20 +320,24 @@ def execute_agendamento(agendamento_id):
             if not agendamento or agendamento.status != 'agendado':
                 return
 
+            is_recorrente = agendamento.tipo_recorrencia != 'none'
+
             if Config.STREAM_VALIDATE_ON_EXECUTE:
                 radio = Radio.query.get(agendamento.radio_id)
                 if not radio or not radio.stream_url:
-                    agendamento.status = 'erro'
+                    agendamento.status = 'agendado' if is_recorrente else 'erro'
                     db.session.commit()
                     broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
-                    unschedule_agendamento(agendamento.id)
+                    if not is_recorrente:
+                        unschedule_agendamento(agendamento.id)
                     return
+
                 ok, reason = validate_stream_url(
                     radio.stream_url,
                     timeout_seconds=Config.STREAM_VALIDATE_TIMEOUT_SECONDS,
                 )
                 if not ok:
-                    agendamento.status = 'erro'
+                    agendamento.status = 'agendado' if is_recorrente else 'erro'
                     db.session.commit()
                     broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
                     try:
@@ -342,7 +346,8 @@ def execute_agendamento(agendamento_id):
                         )
                     except Exception:
                         pass
-                    unschedule_agendamento(agendamento.id)
+                    if not is_recorrente:
+                        unschedule_agendamento(agendamento.id)
                     return
 
             gravacao = Gravacao(
@@ -359,26 +364,23 @@ def execute_agendamento(agendamento_id):
             db.session.commit()
             broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
 
-            next_status = _next_status_after_run(agendamento)
             try:
-                # Bloqueia até terminar; recording_service finaliza status e atualiza gravação/arquivo
+                # Nao bloquear o scheduler durante toda a duracao da gravacao.
                 start_recording(
                     gravacao,
                     duration_seconds=agendamento.duracao_minutos * 60,
                     agendamento=agendamento,
-                    block=True,
+                    block=False,
                 )
             except Exception:
-                agendamento.status = 'erro'
+                agendamento.status = 'agendado' if is_recorrente else 'erro'
                 gravacao.status = 'erro'
                 db.session.commit()
                 broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
                 broadcast_update(f"user_{agendamento.user_id}", "gravacao_updated", gravacao.to_dict())
-            # Fallback para nao ficar travado em "em_execucao"/"Gravando"
-            if agendamento.status == 'em_execucao':
-                agendamento.status = next_status
-                db.session.commit()
-                broadcast_update(f"user_{agendamento.user_id}", "agendamento_updated", agendamento.to_dict())
+                if not is_recorrente:
+                    unschedule_agendamento(agendamento.id)
+                return
 
             if agendamento.tipo_recorrencia == 'none':
                 unschedule_agendamento(agendamento.id)

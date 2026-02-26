@@ -17,7 +17,7 @@ echo "PostgreSQL está pronto!"
 # Iniciar a aplicação
 exec gunicorn \
   --worker-class eventlet \
-  --workers "${GUNICORN_WORKERS:-2}" \
+  --workers "${GUNICORN_WORKERS:-1}" \
   --bind 0.0.0.0:5000 \
   --timeout "${GUNICORN_TIMEOUT:-300}" \
   --graceful-timeout "${GUNICORN_GRACEFUL_TIMEOUT:-30}" \
