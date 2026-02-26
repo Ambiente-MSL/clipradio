@@ -33,6 +33,9 @@ def iter_audio_files(audio_dir: str) -> Iterable[str]:
             continue
         path = os.path.join(audio_dir, name)
         if os.path.isfile(path):
+            marker_path = f"{path}.dropbox"
+            if os.path.exists(marker_path):
+                continue
             yield path
 
 
@@ -79,6 +82,12 @@ def main() -> int:
         action="store_true",
         help="Remove o arquivo local apos upload bem-sucedido.",
     )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=0,
+        help="Processa no maximo N arquivos (0 = sem limite).",
+    )
     args = parser.parse_args()
 
     cfg = get_dropbox_config()
@@ -94,11 +103,13 @@ def main() -> int:
     delete_local = bool(args.delete_local or (cfg.delete_local_after_upload and cfg.local_retention_days <= 0))
 
     files = list(iter_audio_files(audio_dir))
+    if args.limit and args.limit > 0:
+        files = files[: args.limit]
     if not files:
-        print(f"Nenhum arquivo encontrado em {audio_dir}")
+        print(f"Nenhum arquivo pendente encontrado em {audio_dir}")
         return 0
 
-    print(f"Encontrados {len(files)} arquivo(s) em {audio_dir}")
+    print(f"Encontrados {len(files)} arquivo(s) pendente(s) em {audio_dir}")
     print(f"Destino Dropbox: {cfg.audio_path}")
     print(f"Remover local apos upload: {'sim' if delete_local else 'nao'}")
 
@@ -134,6 +145,13 @@ def main() -> int:
                         os.remove(local_path)
                     except Exception as exc:
                         print(f"Falha ao remover local {local_path}: {exc}")
+                else:
+                    marker_path = f"{local_path}.dropbox"
+                    try:
+                        with open(marker_path, "w", encoding="utf-8") as fp:
+                            fp.write(remote_path)
+                    except Exception as exc:
+                        print(f"Falha ao criar marcador {marker_path}: {exc}")
         except DropboxError as exc:
             failed += 1
             print(f"Falha no upload {local_path}: {exc}")
