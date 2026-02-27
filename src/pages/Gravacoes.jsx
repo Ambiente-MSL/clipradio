@@ -307,8 +307,10 @@ const GravacaoItem = ({
   const [transcriptionSegments, setTranscriptionSegments] = useState(null);
   const [isTranscriptionSegmentsLoading, setIsTranscriptionSegmentsLoading] = useState(false);
   const [isReportGenerating, setIsReportGenerating] = useState(false);
+  const [isTranscriptionExpanded, setIsTranscriptionExpanded] = useState(false);
   const [tooltipState, setTooltipState] = useState({ visible: false, text: '', x: 0, y: 0 });
   const tooltipRafRef = useRef(null);
+  const transcriptionContentRef = useRef(null);
 
   useEffect(() => {
     setTranscriptionData((prev) => ({
@@ -325,6 +327,7 @@ const GravacaoItem = ({
   useEffect(() => {
     if (!isTranscriptionOpen) {
       setIsTranscriptionLoading(false);
+      setIsTranscriptionExpanded(false);
     }
   }, [isTranscriptionOpen]);
 
@@ -1133,6 +1136,7 @@ const GravacaoItem = ({
         key={key}
         className={highlightClass}
         style={highlightStyle}
+        data-transcription-highlight="true"
         onMouseEnter={(event) => handleHighlightEnter(event, tooltipText)}
         onMouseMove={(event) => handleHighlightMove(event, tooltipText)}
         onMouseLeave={handleHighlightLeave}
@@ -1200,6 +1204,17 @@ const GravacaoItem = ({
     }
     return nodes;
   }, [transcriptionData.texto, activeTag, transcriptionSegments]);
+
+  useEffect(() => {
+    if (!isTranscriptionOpen) return;
+    if (!activeTagId) return;
+    const container = transcriptionContentRef.current;
+    if (!container) return;
+    const firstOccurrence = container.querySelector('[data-transcription-highlight="true"]');
+    if (!firstOccurrence || typeof firstOccurrence.scrollIntoView !== 'function') return;
+    firstOccurrence.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [activeTagId, highlightedTranscription, isTranscriptionOpen]);
+
   return (
     <>
       {tooltipState.visible && createPortal(
@@ -1340,6 +1355,24 @@ const GravacaoItem = ({
             >
               <Copy className="w-4 h-4" />
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsTranscriptionExpanded((prev) => !prev)}
+              disabled={!transcriptionData.texto}
+            >
+              {isTranscriptionExpanded ? (
+                <>
+                  <ChevronUp className="w-4 h-4 mr-2" />
+                  Recolher texto
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-4 h-4 mr-2" />
+                  Expandir texto
+                </>
+              )}
+            </Button>
             </div>
             <div className="text-xs text-muted-foreground lg:ml-auto">
               Progresso: {progressValue}% | Tempo percorrido: {elapsedLabel} | Última atualização: {idleLabel}
@@ -1377,7 +1410,10 @@ const GravacaoItem = ({
           <div className="mt-3 h-2 w-full rounded-full bg-slate-800/80 overflow-hidden">
             <div className="h-full bg-emerald-400 transition-all duration-300" style={{ width: `${progressValue}%` }} />
           </div>
-          <div className="mt-4 rounded-md bg-slate-900/60 p-3 max-h-60 overflow-y-auto">
+          <div
+            ref={transcriptionContentRef}
+            className={`mt-4 rounded-md bg-slate-900/60 p-3 overflow-y-auto ${isTranscriptionExpanded ? 'max-h-[70vh]' : 'max-h-60'}`}
+          >
             {transcriptionData.status === 'interrompendo' ? (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader className="w-4 h-4 animate-spin" />
@@ -2467,7 +2503,5 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
   );
 
 };
-
-
 
 export default Gravacoes;
