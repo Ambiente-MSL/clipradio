@@ -9,8 +9,6 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    networks:
-      - app_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
@@ -18,16 +16,14 @@ services:
       retries: 5
 
   backend:
-    build: ./backend
-    container_name: clipradio_backend
-    restart: always
-    labels:
-      - autoheal=true
+    build:
+      context: ./backend
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "2027:5000"
+    expose:
+      - "5000"
     environment:
       DB_HOST: db
       DB_PORT: 5432
@@ -62,10 +58,8 @@ services:
       GUNICORN_MAX_REQUESTS: ${GUNICORN_MAX_REQUESTS:-1000}
       GUNICORN_MAX_REQUESTS_JITTER: ${GUNICORN_MAX_REQUESTS_JITTER:-100}
     volumes:
-      - ./backend/storage:/app/storage
-      - ./backend/uploads:/app/uploads
-    networks:
-      - app_network
+      - backend_storage:/app/storage
+      - backend_uploads:/app/uploads
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health', timeout=5).read()\" || exit 1"]
       interval: 20s
@@ -78,34 +72,15 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        - VITE_API_URL=${VITE_API_URL}
-    container_name: clipradio_frontend
+        VITE_API_URL: ${VITE_API_URL}
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
-    ports:
-      - "2026:80"
-    networks:
-      - app_network
-
-  autoheal:
-    image: willfarrell/autoheal:latest
-    container_name: clipradio_autoheal
-    restart: always
-    environment:
-      AUTOHEAL_CONTAINER_LABEL: autoheal
-      AUTOHEAL_INTERVAL: 15
-      AUTOHEAL_START_PERIOD: 60
-      AUTOHEAL_DEFAULT_STOP_TIMEOUT: 20
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    networks:
-      - app_network
-
-networks:
-  app_network:
-    driver: bridge
+    expose:
+      - "80"
 
 volumes:
   pgdata:
+  backend_storage:
+  backend_uploads:
