@@ -216,7 +216,49 @@ export default defineConfig({
 				'@babel/traverse',
 				'@babel/generator',
 				'@babel/types'
-			]
+			],
+			output: {
+				manualChunks(id) {
+					if (!id.includes('node_modules')) {
+						return;
+					}
+
+					if (
+						id.includes('/react/') ||
+						id.includes('/react-dom/') ||
+						id.includes('/react-router-dom/') ||
+						id.includes('/react-helmet/')
+					) {
+						return 'vendor-react';
+					}
+
+					if (
+						id.includes('/@radix-ui/') ||
+						id.includes('/lucide-react/')
+					) {
+						return 'vendor-ui';
+					}
+
+					if (id.includes('/hls.js/')) {
+						return 'vendor-media';
+					}
+
+					if (id.includes('/socket.io-client/')) {
+						return 'vendor-realtime';
+					}
+
+					if (id.includes('/framer-motion/')) {
+						return 'vendor-motion';
+					}
+
+					if (
+						id.includes('/date-fns/') ||
+						id.includes('/date-fns-tz/')
+					) {
+						return 'vendor-dates';
+					}
+				},
+			},
 		}
 	}
 });

@@ -39,6 +39,19 @@ body {
   min-height: 100vh;
 }
 
+.page-fade-in {
+  animation: page-fade-in 0.3s ease-in-out;
+}
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .glass-effect {
   background: hsl(var(--card) / 0.5);
   backdrop-filter: blur(20px);
