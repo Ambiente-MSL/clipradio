@@ -77,7 +77,7 @@ def get_audio(filename):
 
         dropbox_cfg = get_dropbox_config()
         if not dropbox_cfg.is_ready:
-            return jsonify({"error": "File not found"}), 404
+            return jsonify({"error": "Arquivo não encontrado"}), 404
 
         range_header = None if download_requested else request.headers.get("Range")
         candidates = []
@@ -135,13 +135,13 @@ def get_audio(filename):
             if resp.ok or resp.status_code == 206:
                 break
             try:
-                current_app.logger.error(f"Dropbox download failed ({resp.status_code}): {resp.text}")
+                current_app.logger.error(f"Falha no download via Dropbox ({resp.status_code}): {resp.text}")
             except Exception:
                 pass
-            return jsonify({"error": "File not found"}), 404
+            return jsonify({"error": "Arquivo não encontrado"}), 404
 
         if resp is None or resp.status_code in (404, 409):
-            return jsonify({"error": "File not found"}), 404
+            return jsonify({"error": "Arquivo não encontrado"}), 404
 
         headers = {}
         for key in ("Content-Length", "Content-Range", "Accept-Ranges"):
@@ -163,12 +163,12 @@ def get_audio(filename):
             current_app.logger.exception(f"Falha ao servir audio via Dropbox: {exc}")
         except Exception:
             pass
-        return jsonify({"error": "File not found"}), 404
+        return jsonify({"error": "Arquivo não encontrado"}), 404
 
 
 @bp.route("/clips/<filename>", methods=["GET"])
 def get_clip(filename):
     clip_path = os.path.join(current_app.config["STORAGE_PATH"], "clips", filename)
     if not os.path.exists(clip_path):
-        return jsonify({"error": "File not found"}), 404
+        return jsonify({"error": "Arquivo não encontrado"}), 404
     return send_file(clip_path, mimetype="audio/mpeg")

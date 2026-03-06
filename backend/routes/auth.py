@@ -29,11 +29,11 @@ def register():
     data = request.get_json() or {}
     
     if not data.get('email') or not data.get('password'):
-        return jsonify({'error': 'Email and password required'}), 400
+        return jsonify({'error': 'Email e senha são obrigatórios'}), 400
     
     try:
         if User.query.filter_by(email=data['email']).first():
-            return jsonify({'error': 'Email already exists'}), 409
+            return jsonify({'error': 'Este email já está cadastrado'}), 409
         
         raw_nome = data.get('nome')
         if isinstance(raw_nome, str) and raw_nome.strip():
@@ -54,22 +54,22 @@ def register():
     
     except IntegrityError:
         db.session.rollback()
-        return jsonify({'error': 'Email already exists'}), 409
+        return jsonify({'error': 'Este email já está cadastrado'}), 409
     except SQLAlchemyError as e:
         current_app.logger.exception("Erro de banco ao registrar usuário")
         db.session.rollback()
-        return jsonify({'error': 'Database error while creating user', 'detail': str(e)}), 500
+        return jsonify({'error': 'Erro de banco ao criar usuário', 'detail': str(e)}), 500
     except Exception as e:
         current_app.logger.exception("Erro inesperado no registro")
         db.session.rollback()
-        return jsonify({'error': 'Internal server error', 'detail': str(e)}), 500
+        return jsonify({'error': 'Erro interno do servidor', 'detail': str(e)}), 500
 
 @bp.route('/login', methods=['POST'])
 def login():
     data = request.get_json() or {}
     
     if not data.get('email') or not data.get('password'):
-        return jsonify({'error': 'Email and password required'}), 400
+        return jsonify({'error': 'Email e senha são obrigatórios'}), 400
     
     try:
         user = _query_with_retry(
@@ -78,17 +78,17 @@ def login():
     except OperationalError:
         current_app.logger.exception("Erro ao buscar usuário para login")
         db.session.rollback()
-        return jsonify({'error': 'Database unavailable. Please try again.'}), 500
+        return jsonify({'error': 'Banco de dados indisponível. Tente novamente.'}), 500
     except SQLAlchemyError:
         current_app.logger.exception("Erro ao buscar usuário para login")
         db.session.rollback()
-        return jsonify({'error': 'Database unavailable. Please try again.'}), 500
+        return jsonify({'error': 'Banco de dados indisponível. Tente novamente.'}), 500
     
     if not user or not user.check_password(data.get('password', '')):
-        return jsonify({'error': 'Invalid credentials'}), 401
+        return jsonify({'error': 'Email ou senha inválidos'}), 401
     
     if not user.ativo:
-        return jsonify({'error': 'User inactive'}), 403
+        return jsonify({'error': 'Usuário inativo'}), 403
     
     token = create_token(user.id)
     return jsonify({'user': user.to_dict(), 'token': token}), 200
@@ -105,10 +105,10 @@ def get_me():
     
     user = User.query.get(user_id)
     if not user:
-        return jsonify({'error': 'User not found'}), 404
+        return jsonify({'error': 'Usuário não encontrado'}), 404
     return jsonify(user.to_dict()), 200
 
 @bp.route('/logout', methods=['POST'])
 @token_required
 def logout():
-    return jsonify({'message': 'Logged out'}), 200
+    return jsonify({'message': 'Logout realizado com sucesso'}), 200

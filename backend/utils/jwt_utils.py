@@ -28,11 +28,11 @@ def token_required(f):
     def decorated(*args, **kwargs):
         token = request.headers.get('Authorization', '').replace('Bearer ', '')
         if not token:
-            return jsonify({'error': 'Token not provided'}), 401
+            return jsonify({'error': 'Token não informado'}), 401
         
         payload = decode_token(token)
         if not payload:
-            return jsonify({'error': 'Invalid token'}), 401
+            return jsonify({'error': 'Token inválido'}), 401
         
         request.user_id = payload.get('user_id')
         request.is_admin = payload.get('is_admin', False)

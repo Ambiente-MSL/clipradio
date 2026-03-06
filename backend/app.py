@@ -139,7 +139,7 @@ def create_app():
     @app.errorhandler(500)
     def server_error(e):
         db.session.rollback()
-        return jsonify({'error': 'Internal server error'}), 500
+        return jsonify({'error': 'Erro interno do servidor'}), 500
     
     return app
 

@@ -489,7 +489,7 @@ def _raise_for_response(resp: requests.Response, *, action: str) -> None:
         detail = resp.json()
     except Exception:
         detail = resp.text
-    raise DropboxError(f"Dropbox {action} failed (status={resp.status_code}): {detail}")
+    raise DropboxError(f"Erro do Dropbox na operacao '{action}' (status={resp.status_code}): {detail}")
 
 
 def upload_file(
