@@ -174,7 +174,7 @@ def main() -> int:
 
     cfg = get_dropbox_config()
     if not cfg.is_ready:
-        print("Dropbox nao configurado. Defina DROPBOX_UPLOAD_ENABLED=true e DROPBOX_ACCESS_TOKEN.")
+        print("Dropbox nao configurado. Defina DROPBOX_UPLOAD_ENABLED=true e DROPBOX_ACCESS_TOKEN ou DROPBOX_APP_KEY + DROPBOX_REFRESH_TOKEN.")
         return 2
 
     base_path = args.base_path or cfg.audio_path

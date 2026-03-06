@@ -79,6 +79,34 @@ const buildTranscriptionReportName = (gravacao, audioUrl) => {
   return `${baseName}_relatorio.pdf`;
 };
 
+const appendQueryParam = (url, key, value) => {
+  if (!url) return '';
+  const joiner = url.includes('?') ? '&' : '?';
+  return `${url}${joiner}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+};
+
+const buildAudioFileUrl = (gravacao, { download = false } = {}) => {
+  const baseUrl = resolveFileUrl(gravacao?.arquivo_url, gravacao?.arquivo_nome);
+  if (!baseUrl) return '';
+  return download ? appendQueryParam(baseUrl, 'download', '1') : baseUrl;
+};
+
+const canPlayAudio = (gravacao) => (
+  Boolean(gravacao?.arquivo_url || gravacao?.arquivo_nome) && gravacao?.audio_can_stream !== false
+);
+
+const canDownloadAudio = (gravacao) => (
+  Boolean(gravacao?.arquivo_url || gravacao?.arquivo_nome) && gravacao?.audio_can_download !== false
+);
+
+const getAudioAvailabilityMessage = (gravacao) => {
+  const days = Number(gravacao?.audio_stream_max_age_days);
+  if (Number.isFinite(days) && days >= 0) {
+    return `Audios com mais de ${days} dias ficam disponiveis apenas para download.`;
+  }
+  return 'Audio indisponivel para reproducao.';
+};
+
 const escapeRegExp = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const hexToRgb = (value) => {
   const normalized = String(value || '').trim();
@@ -323,6 +351,9 @@ const GravacaoItem = ({
   }, [gravacao?.transcricao_status, gravacao?.transcricao_erro, gravacao?.transcricao_texto, gravacao?.transcricao_progresso]);
 
   const isTranscriptionOpen = openTranscriptionId === gravacao?.id;
+  const canPlayThisAudio = canPlayAudio(gravacao);
+  const canDownloadThisAudio = canDownloadAudio(gravacao);
+  const audioAvailabilityMessage = getAudioAvailabilityMessage(gravacao);
 
   useEffect(() => {
     if (!isTranscriptionOpen) {
@@ -335,7 +366,15 @@ const GravacaoItem = ({
 
   const handlePlay = () => {
 
-    if (!gravacao.arquivo_url) {
+    if (!canPlayThisAudio) {
+
+      toast({ title: 'Audio indisponivel', description: audioAvailabilityMessage, variant: 'destructive' });
+
+      return;
+
+    }
+
+    if (!gravacao.arquivo_url && !gravacao.arquivo_nome) {
 
       toast({ title: 'Áudio indisponível', description: 'O arquivo desta gravação não foi encontrado.', variant: 'destructive' });
 
@@ -351,7 +390,7 @@ const GravacaoItem = ({
 
     } else {
 
-      const audioUrl = resolveFileUrl(gravacao.arquivo_url, gravacao.arquivo_nome);
+      const audioUrl = buildAudioFileUrl(gravacao);
       onPlay();
 
       setGlobalAudioTrack({
@@ -372,7 +411,15 @@ const GravacaoItem = ({
 
   const handleDownload = async () => {
 
-    if (!gravacao.arquivo_url) {
+    if (!canDownloadThisAudio) {
+
+      toast({ title: "Download indisponivel", description: "O arquivo desta gravacao nao foi encontrado.", variant: 'destructive' });
+
+      return;
+
+    }
+
+    if (!gravacao.arquivo_url && !gravacao.arquivo_nome) {
 
       toast({ title: "Download indisponível", description: "O arquivo desta gravação não foi encontrado.", variant: 'destructive' });
 
@@ -382,12 +429,16 @@ const GravacaoItem = ({
 
     try {
 
-      const audioUrl = resolveFileUrl(gravacao.arquivo_url, gravacao.arquivo_nome);
+      const audioUrl = buildAudioFileUrl(gravacao, { download: true });
       if (!audioUrl) {
         toast({ title: "Download indisponível", description: "O arquivo desta gravação não foi encontrado.", variant: 'destructive' });
         return;
       }
       const response = await fetch(audioUrl);
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data?.error || `Falha no download (${response.status})`);
+      }
 
       const blob = await response.blob();
 
@@ -1232,7 +1283,7 @@ const GravacaoItem = ({
 
       <div className="flex items-center w-full gap-4">
 
-        <div className="flex items-center"><Checkbox checked={isSelected} onCheckedChange={() => onToggleSelection(gravacao.id)} className="mr-4" /><Button size="icon" variant="ghost" className="rounded-full w-14 h-14" onClick={handlePlay}>{isPlaying ? <Pause className="w-6 h-6 text-primary" /> : <Play className="w-6 h-6 text-primary" />}</Button></div>
+        <div className="flex items-center"><Checkbox checked={isSelected} onCheckedChange={() => onToggleSelection(gravacao.id)} className="mr-4" /><Button size="icon" variant="ghost" className="rounded-full w-14 h-14" onClick={handlePlay} disabled={!canPlayThisAudio} title={canPlayThisAudio ? 'Reproduzir audio' : audioAvailabilityMessage}>{isPlaying ? <Pause className="w-6 h-6 text-primary" /> : <Play className="w-6 h-6 text-primary" />}</Button></div>
 
         <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-4">
 
@@ -1263,6 +1314,11 @@ const GravacaoItem = ({
         <div className="flex flex-wrap items-center justify-end gap-2">
 
           <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${statusColors[gravacao.status] || statusColors.agendado}`}>{statusText[gravacao.status] || 'Desconhecido'}</span>
+          {!canPlayThisAudio && canDownloadThisAudio && (
+            <span className="px-3 py-1 text-xs font-semibold rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">
+              Somente download
+            </span>
+          )}
 
           <Button size="icon" variant="ghost" className="h-9 w-9" onClick={handleStartTranscription} disabled={!gravacao.arquivo_url} title="Transcrever">
             <FileText className={`w-5 h-5 ${hasTranscription ? 'text-emerald-400' : 'text-white'}`} />
@@ -1277,7 +1333,7 @@ const GravacaoItem = ({
           >
             {isTranscriptionOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
           </Button>
-          <Button size="icon" variant="ghost" className="h-9 w-9" onClick={handleDownload} disabled={!gravacao.arquivo_url} title="Baixar">
+          <Button size="icon" variant="ghost" className="h-9 w-9" onClick={handleDownload} disabled={!canDownloadThisAudio} title="Baixar">
             <Download className="w-5 h-5" />
           </Button>
 

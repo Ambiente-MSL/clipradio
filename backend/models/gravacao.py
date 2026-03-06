@@ -5,6 +5,8 @@ import uuid
 from sqlalchemy import inspect
 from sqlalchemy.orm.attributes import NO_VALUE
 
+from services.audio_access_service import build_audio_access_payload
+
 LOCAL_TZ = ZoneInfo("America/Fortaleza")
 
 class Gravacao(db.Model):
@@ -73,6 +75,7 @@ class Gravacao(db.Model):
         data['transcricao_modelo'] = self.transcricao_modelo
         data['transcricao_progresso'] = self.transcricao_progresso
         data['transcricao_cancelada'] = self.transcricao_cancelada
+        data.update(build_audio_access_payload(self))
         if include_transcricao:
             data['transcricao_texto'] = self.transcricao_texto
         

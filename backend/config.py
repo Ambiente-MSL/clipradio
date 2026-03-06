@@ -62,10 +62,18 @@ class Config:
     # Dropbox (opcional) - arquivamento de áudios para economizar disco
     DROPBOX_UPLOAD_ENABLED = os.getenv('DROPBOX_UPLOAD_ENABLED', 'false').lower() == 'true'
     DROPBOX_ACCESS_TOKEN = os.getenv('DROPBOX_ACCESS_TOKEN')
+    DROPBOX_APP_KEY = os.getenv('DROPBOX_APP_KEY')
+    DROPBOX_APP_SECRET = os.getenv('DROPBOX_APP_SECRET')
+    DROPBOX_REFRESH_TOKEN = os.getenv('DROPBOX_REFRESH_TOKEN')
     DROPBOX_AUDIO_PATH = os.getenv('DROPBOX_AUDIO_PATH', '/clipradio/audio')
     DROPBOX_AUDIO_LAYOUT = os.getenv('DROPBOX_AUDIO_LAYOUT', 'flat')
+    DROPBOX_AUDIO_UNRECOGNIZED_PATH = os.getenv('DROPBOX_AUDIO_UNRECOGNIZED_PATH', '/clipradio/audio/_NAO_RECONHECIDO')
     DROPBOX_DELETE_LOCAL_AFTER_UPLOAD = os.getenv('DROPBOX_DELETE_LOCAL_AFTER_UPLOAD', 'true').lower() == 'true'
     DROPBOX_LOCAL_RETENTION_DAYS = int(os.getenv('DROPBOX_LOCAL_RETENTION_DAYS', '0') or 0)
+    try:
+        AUDIO_STREAM_MAX_AGE_DAYS = int(os.getenv('AUDIO_STREAM_MAX_AGE_DAYS', '30') or 30)
+    except (TypeError, ValueError):
+        AUDIO_STREAM_MAX_AGE_DAYS = 30
 
     TRANSCRIBE_ENABLED = os.getenv('TRANSCRIBE_ENABLED', 'true').lower() == 'true'
     TRANSCRIBE_MODEL = os.getenv('TRANSCRIBE_MODEL', 'small')
