@@ -13,6 +13,12 @@ from config import Config
 from models.agendamento import Agendamento
 from models.gravacao import Gravacao
 from models.radio import Radio
+from services.audio_storage_service import (
+    get_dropbox_marker_path,
+    resolve_audio_filepath,
+    write_dropbox_marker,
+)
+from services.dropbox_service import build_audio_destination, get_dropbox_config, upload_file
 from services.recording_service import start_recording, validate_stream_url
 from services.websocket_service import broadcast_update
 
@@ -137,6 +143,96 @@ def cleanup_local_audio_archived():
                             pass
                 except Exception:
                     continue
+    except Exception as e:
+        try:
+            print(f"cleanup_local_audio_archived falhou: {e}")
+        except Exception:
+            pass
+    finally:
+        _safe_session_remove(app_obj)
+
+
+def cleanup_local_audio_archived():
+    app_obj = _capture_scheduler_app()
+    if not app_obj:
+        return
+
+    try:
+        with app_obj.app_context():
+            retention_days = int(app_obj.config.get("DROPBOX_LOCAL_RETENTION_DAYS") or 0)
+            if retention_days <= 0:
+                return
+
+            dropbox_cfg = get_dropbox_config()
+            if not dropbox_cfg.is_ready:
+                return
+
+            cutoff = datetime.now(tz=LOCAL_TZ) - timedelta(days=retention_days)
+            gravacoes = (
+                Gravacao.query.filter(Gravacao.status == "concluido")
+                .filter(Gravacao.criado_em <= cutoff)
+                .all()
+            )
+
+            for gravacao in gravacoes:
+                file_path = resolve_audio_filepath(gravacao)
+                if not file_path or not os.path.isfile(file_path):
+                    continue
+
+                marker_path = get_dropbox_marker_path(file_path)
+                if marker_path and os.path.exists(marker_path):
+                    if dropbox_cfg.delete_local_after_upload:
+                        try:
+                            os.remove(file_path)
+                        except Exception:
+                            pass
+                        try:
+                            os.remove(marker_path)
+                        except Exception:
+                            pass
+                    continue
+
+                radio_obj = getattr(gravacao, "radio", None)
+                if radio_obj is None:
+                    try:
+                        radio_obj = Radio.query.get(gravacao.radio_id)
+                    except Exception:
+                        radio_obj = None
+
+                try:
+                    remote_path, _ = build_audio_destination(
+                        gravacao,
+                        radio=radio_obj,
+                        original_filename=os.path.basename(file_path),
+                        base_path=dropbox_cfg.audio_path,
+                        layout=dropbox_cfg.audio_layout,
+                    )
+                    upload_file(file_path, remote_path, token=dropbox_cfg.access_token)
+                    write_dropbox_marker(file_path, remote_path)
+
+                    try:
+                        file_size_mb = round(os.path.getsize(file_path) / (1024 * 1024), 2)
+                        if (gravacao.tamanho_mb or 0) != file_size_mb:
+                            gravacao.tamanho_mb = file_size_mb
+                            db.session.commit()
+                    except Exception:
+                        db.session.rollback()
+
+                    if dropbox_cfg.delete_local_after_upload:
+                        try:
+                            os.remove(file_path)
+                        except Exception:
+                            pass
+                        try:
+                            if marker_path and os.path.exists(marker_path):
+                                os.remove(marker_path)
+                        except Exception:
+                            pass
+                except Exception as exc:
+                    try:
+                        print(f"Falha ao arquivar audio {gravacao.id}: {exc}")
+                    except Exception:
+                        pass
     except Exception as e:
         try:
             print(f"cleanup_local_audio_archived falhou: {e}")

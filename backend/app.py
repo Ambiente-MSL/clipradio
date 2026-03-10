@@ -95,6 +95,14 @@ def create_app():
     def health():
         db_status = 'disconnected'
         scheduler_status = 'unknown'
+        dropbox_payload = {
+            'status': 'disabled',
+            'enabled': False,
+            'ready': False,
+            'audio_layout': app.config.get('DROPBOX_AUDIO_LAYOUT'),
+            'local_retention_days': app.config.get('DROPBOX_LOCAL_RETENTION_DAYS'),
+            'stream_max_age_days': app.config.get('AUDIO_STREAM_MAX_AGE_DAYS'),
+        }
 
         try:
             # Verifica se banco responde consultas simples
@@ -103,8 +111,23 @@ def create_app():
             db_status = 'connected'
 
             from services.scheduler_service import scheduler
+            from services.dropbox_service import get_dropbox_config
 
             scheduler_status = 'running' if scheduler.running else 'stopped'
+            dropbox_cfg = get_dropbox_config()
+            dropbox_payload.update({
+                'enabled': bool(dropbox_cfg.enabled),
+                'ready': bool(dropbox_cfg.is_ready),
+                'audio_layout': dropbox_cfg.audio_layout,
+                'local_retention_days': dropbox_cfg.local_retention_days,
+                'status': (
+                    'configured'
+                    if dropbox_cfg.enabled and dropbox_cfg.is_ready
+                    else 'misconfigured'
+                    if dropbox_cfg.enabled
+                    else 'disabled'
+                ),
+            })
             if scheduler_status != 'running':
                 raise RuntimeError("scheduler not running")
 
@@ -112,6 +135,7 @@ def create_app():
                 'status': 'ok',
                 'database': db_status,
                 'scheduler': scheduler_status,
+                'dropbox': dropbox_payload,
             })
         except Exception as e:
             app.logger.exception("Health check falhou")
@@ -119,6 +143,7 @@ def create_app():
                 'status': 'error',
                 'database': db_status,
                 'scheduler': scheduler_status,
+                'dropbox': dropbox_payload,
                 'error': str(e),
             }), 500
     

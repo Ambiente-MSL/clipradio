@@ -67,7 +67,7 @@ def _normalize_layout(value: Optional[str]) -> str:
 def _normalize_dropbox_audio_path(value: Optional[str]) -> str:
     raw = str(value or "").strip()
     if not raw:
-        return "/clipradio/audio"
+        return "/audio"
     if raw.startswith(("http://", "https://")):
         try:
             parsed = urlparse(raw)
@@ -84,10 +84,26 @@ def _normalize_dropbox_audio_path(value: Optional[str]) -> str:
                     raw = path
         except Exception:
             pass
+    raw = raw.replace("\\", "/").strip()
+    lowered = raw.lower()
+    if ":/" in raw or lowered.startswith("/users/"):
+        parts = [part for part in raw.split("/") if part]
+        if "Aplicativos" in parts:
+            idx = parts.index("Aplicativos")
+            if idx + 2 <= len(parts):
+                relative_parts = parts[idx + 2 :]
+                if relative_parts:
+                    raw = "/" + "/".join(relative_parts)
+        elif "Apps" in parts:
+            idx = parts.index("Apps")
+            if idx + 2 <= len(parts):
+                relative_parts = parts[idx + 2 :]
+                if relative_parts:
+                    raw = "/" + "/".join(relative_parts)
     raw = raw.strip().rstrip("/")
     if not raw.startswith("/"):
         raw = f"/{raw}"
-    return raw or "/clipradio/audio"
+    return raw or "/audio"
 
 
 def _normalize_unrecognized_path(value: Optional[str], *, base_path: str) -> str:
@@ -188,7 +204,7 @@ def build_audio_folder_path(
     base_path: Optional[str] = None,
 ) -> str:
     cfg = get_dropbox_config()
-    root = (base_path or cfg.audio_path or "/clipradio/audio").rstrip("/")
+    root = (base_path or cfg.audio_path or "/audio").rstrip("/")
 
     radio_obj = radio or getattr(gravacao, "radio", None)
     radio_name = getattr(radio_obj, "nome", None)
@@ -267,8 +283,8 @@ def get_dropbox_config() -> DropboxConfig:
     app_key = cfg.get("DROPBOX_APP_KEY") or os.getenv("DROPBOX_APP_KEY")
     app_secret = cfg.get("DROPBOX_APP_SECRET") or os.getenv("DROPBOX_APP_SECRET")
     refresh_token = cfg.get("DROPBOX_REFRESH_TOKEN") or os.getenv("DROPBOX_REFRESH_TOKEN")
-    audio_path = cfg.get("DROPBOX_AUDIO_PATH") or os.getenv("DROPBOX_AUDIO_PATH", "/clipradio/audio")
-    audio_layout = cfg.get("DROPBOX_AUDIO_LAYOUT") or os.getenv("DROPBOX_AUDIO_LAYOUT", "flat")
+    audio_path = cfg.get("DROPBOX_AUDIO_PATH") or os.getenv("DROPBOX_AUDIO_PATH", "/audio")
+    audio_layout = cfg.get("DROPBOX_AUDIO_LAYOUT") or os.getenv("DROPBOX_AUDIO_LAYOUT", "hierarchy")
     unrecognized_path = cfg.get("DROPBOX_AUDIO_UNRECOGNIZED_PATH") or os.getenv(
         "DROPBOX_AUDIO_UNRECOGNIZED_PATH",
         "",
@@ -418,7 +434,7 @@ def build_remote_audio_path(
     layout: Optional[str] = None,
 ) -> str:
     cfg = get_dropbox_config()
-    root = (base_path or cfg.audio_path or "/clipradio/audio").rstrip("/")
+    root = (base_path or cfg.audio_path or "/audio").rstrip("/")
     name = str(filename or "").lstrip("/")
     current_layout = _normalize_layout(layout or cfg.audio_layout)
     if current_layout == "date":
@@ -437,7 +453,7 @@ def build_candidate_audio_paths(
     layout: Optional[str] = None,
 ) -> Tuple[str, ...]:
     cfg = get_dropbox_config()
-    root = (base_path or cfg.audio_path or "/clipradio/audio").rstrip("/")
+    root = (base_path or cfg.audio_path or "/audio").rstrip("/")
     name = str(filename or "").lstrip("/")
     current_layout = _normalize_layout(layout or cfg.audio_layout)
 

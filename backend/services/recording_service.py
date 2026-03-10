@@ -12,6 +12,7 @@ from app import db
 from config import Config
 from models.gravacao import Gravacao
 from models.radio import Radio
+from services.audio_storage_service import resolve_audio_filepath, write_dropbox_marker
 from services.websocket_service import broadcast_update
 
 LOCAL_TZ = ZoneInfo("America/Fortaleza")
@@ -128,14 +129,8 @@ def validate_stream_url(stream_url, *, timeout_seconds=None):
 
 def _get_audio_filepath(gravacao):
     """Retorna o caminho absoluto do arquivo de áudio associado, se houver."""
-    if not gravacao:
-        return None
-    filename = gravacao.arquivo_nome
-    if not filename and getattr(gravacao, "arquivo_url", None):
-        filename = gravacao.arquivo_url.rsplit("/", 1)[-1]
-    if not filename:
-        return None
-    return os.path.join(Config.STORAGE_PATH, "audio", filename)
+def _get_audio_filepath(gravacao):
+    return resolve_audio_filepath(gravacao)
 
 
 def _probe_duration_seconds(filepath):
@@ -269,14 +264,19 @@ def _finalizar_gravacao(gravacao, status, filepath=None, duration_seconds=None, 
             from services.dropbox_service import build_audio_destination, get_dropbox_config, upload_file
 
             dropbox_cfg = get_dropbox_config()
-            if dropbox_cfg.is_ready and filepath and os.path.exists(filepath):
+            if (
+                dropbox_cfg.is_ready
+                and dropbox_cfg.local_retention_days <= 0
+                and filepath
+                and os.path.exists(filepath)
+            ):
                 radio_obj = None
                 try:
                     radio_obj = Radio.query.get(gravacao.radio_id)
                 except Exception:
                     radio_obj = None
 
-                remote_path, remote_name = build_audio_destination(
+                remote_path, _ = build_audio_destination(
                     gravacao,
                     radio=radio_obj,
                     original_filename=os.path.basename(filepath),
@@ -290,21 +290,9 @@ def _finalizar_gravacao(gravacao, status, filepath=None, duration_seconds=None, 
 
                 if not should_delete_local:
                     try:
-                        marker_path = f"{filepath}.dropbox"
-                        with open(marker_path, "w", encoding="utf-8") as fp:
-                            fp.write(remote_path)
+                        write_dropbox_marker(filepath, remote_path)
                     except Exception:
                         pass
-
-                if dropbox_cfg.audio_layout == "hierarchy" and remote_name:
-                    can_update_db = not (Config.TRANSCRIBE_ENABLED and gravacao.transcricao_status != 'concluido')
-                    if can_update_db and gravacao.arquivo_nome != remote_name:
-                        gravacao.arquivo_nome = remote_name
-                        gravacao.arquivo_url = f"/api/files/audio/{remote_name}"
-                        try:
-                            db.session.commit()
-                        except Exception:
-                            db.session.rollback()
 
                 if should_delete_local:
                     try:

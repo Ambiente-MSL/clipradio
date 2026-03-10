@@ -10,6 +10,7 @@ from flask import current_app, has_app_context
 from app import db
 from config import Config
 from models.gravacao import Gravacao
+from services.audio_storage_service import get_dropbox_marker_path, resolve_audio_filepath
 from services.websocket_service import broadcast_update
 
 _MODEL = None
@@ -149,45 +150,36 @@ def _resolve_audio_filepath(gravacao):
     return filepath
 
 
+def _get_audio_filepath(gravacao):
+    return resolve_audio_filepath(gravacao)
+
+
+def _resolve_audio_filepath(gravacao):
+    return resolve_audio_filepath(gravacao)
+
+
 def _cleanup_local_audio_after_transcription(gravacao):
     if not gravacao:
         return
     try:
-        from services.dropbox_service import build_audio_destination, get_dropbox_config
+        from services.dropbox_service import get_dropbox_config
     except Exception:
         return
     try:
         dropbox_cfg = get_dropbox_config()
     except Exception:
         return
-    if not dropbox_cfg.is_ready:
-        return
-    if dropbox_cfg.audio_layout == "hierarchy":
-        try:
-            radio_obj = getattr(gravacao, "radio", None)
-            remote_path, remote_name = build_audio_destination(
-                gravacao,
-                radio=radio_obj,
-                original_filename=gravacao.arquivo_nome or gravacao.arquivo_url,
-                base_path=dropbox_cfg.audio_path,
-            )
-            if remote_name and gravacao.arquivo_nome != remote_name:
-                gravacao.arquivo_nome = remote_name
-                gravacao.arquivo_url = f"/api/files/audio/{remote_name}"
-                try:
-                    db.session.commit()
-                except Exception:
-                    db.session.rollback()
-        except Exception:
-            pass
-
-    if not (dropbox_cfg.delete_local_after_upload and dropbox_cfg.local_retention_days <= 0):
+    if not (
+        dropbox_cfg.is_ready
+        and dropbox_cfg.delete_local_after_upload
+        and dropbox_cfg.local_retention_days <= 0
+    ):
         return
 
     filepath = _resolve_audio_filepath(gravacao)
     if not filepath:
         return
-    marker_path = f"{filepath}.dropbox"
+    marker_path = get_dropbox_marker_path(filepath)
     if not os.path.exists(marker_path):
         return
     try:

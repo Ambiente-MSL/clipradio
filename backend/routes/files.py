@@ -1,6 +1,7 @@
 import os
 
 from flask import Blueprint, Response, current_app, jsonify, request, send_file, stream_with_context
+from services.audio_storage_service import resolve_audio_filepath
 
 bp = Blueprint("files", __name__)
 
@@ -20,11 +21,18 @@ def _is_download_requested() -> bool:
 
 def _find_gravacao_by_filename(filename: str):
     from models.gravacao import Gravacao
+    from services.dropbox_service import get_audio_id_from_filename
 
     gravacao = Gravacao.query.filter(Gravacao.arquivo_nome == filename).first()
     if gravacao:
         return gravacao
-    return Gravacao.query.filter(Gravacao.arquivo_url.like(f"%/{filename}")).first()
+    gravacao = Gravacao.query.filter(Gravacao.arquivo_url.like(f"%/{filename}")).first()
+    if gravacao:
+        return gravacao
+    gravacao_id = get_audio_id_from_filename(filename)
+    if not gravacao_id:
+        return None
+    return Gravacao.query.filter(Gravacao.id == gravacao_id).first()
 
 
 def _download_only_response(gravacao):
@@ -74,6 +82,15 @@ def get_audio(filename):
                 as_attachment=download_requested,
                 download_name=os.path.basename(filename),
             )
+        if gravacao:
+            fallback_audio_path = resolve_audio_filepath(gravacao)
+            if fallback_audio_path and os.path.exists(fallback_audio_path):
+                return send_file(
+                    fallback_audio_path,
+                    mimetype=mimetype,
+                    as_attachment=download_requested,
+                    download_name=os.path.basename(filename),
+                )
 
         dropbox_cfg = get_dropbox_config()
         if not dropbox_cfg.is_ready:
