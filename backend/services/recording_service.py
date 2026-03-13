@@ -18,7 +18,7 @@ from services.websocket_service import broadcast_update
 LOCAL_TZ = ZoneInfo("America/Fortaleza")
 MIN_RECORD_SECONDS = 10  # evita gravação zero em caso de input faltando
 ALLOWED_BITRATES = {96, 128}
-ALLOWED_FORMATS = {'mp3', 'opus'}
+ALLOWED_FORMATS = {'mp3', 'opus', 'flac'}
 ALLOWED_AUDIO_MODES = {'mono', 'stereo'}
 ACTIVE_PROCESSES: Dict[str, subprocess.Popen] = {}
 
@@ -397,6 +397,8 @@ def start_recording(gravacao, *, duration_seconds=None, agendamento=None, block=
         ffmpeg_cmd += ['-ac', str(channels)]
         if output_format == 'opus':
             ffmpeg_cmd += ['-c:a', 'libopus', '-b:a', f'{bitrate_kbps}k', '-vbr', 'on']
+        elif output_format == 'flac':
+            ffmpeg_cmd += ['-c:a', 'flac', '-compression_level', '5']
         else:
             ffmpeg_cmd += ['-acodec', 'libmp3lame', '-b:a', f'{bitrate_kbps}k']
 

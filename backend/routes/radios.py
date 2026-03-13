@@ -20,7 +20,7 @@ def _radio_access_allowed(radio, ctx):
     return bool(ctx.get('is_admin') or radio.user_id == ctx.get('user_id'))
 
 ALLOWED_BITRATES = {96, 128}
-ALLOWED_FORMATS = {'mp3', 'opus'}
+ALLOWED_FORMATS = {'mp3', 'opus', 'flac'}
 ALLOWED_AUDIO_MODES = {'mono', 'stereo'}
 
 

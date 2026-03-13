@@ -206,6 +206,8 @@ def _load_model():
             Config.TRANSCRIBE_MODEL,
             device=Config.TRANSCRIBE_DEVICE,
             compute_type=Config.TRANSCRIBE_COMPUTE_TYPE,
+            cpu_threads=max(0, int(Config.TRANSCRIBE_CPU_THREADS or 0)),
+            num_workers=max(1, int(Config.TRANSCRIBE_MODEL_WORKERS or 1)),
         )
     return _MODEL
 
@@ -483,30 +485,32 @@ def transcribe_gravacao(gravacao_id, *, force=False):
 
     prepared_filepath = None
     transcribe_input_path = filepath
-
-    acquired = _TRANSCRIBE_LOCK.acquire(blocking=False)
-    if not acquired:
-        _commit_transcription(
-            gravacao,
-            status="fila",
-            progresso=gravacao.transcricao_progresso or 0,
-            cancelada=False,
-        )
-        while True:
-            if _TRANSCRIBE_LOCK.acquire(timeout=1):
-                break
-            try:
-                db.session.refresh(gravacao)
-                if gravacao.transcricao_cancelada:
-                    _commit_transcription(
-                        gravacao,
-                        status="interrompido",
-                        progresso=gravacao.transcricao_progresso or 0,
-                        cancelada=True,
-                    )
-                    return False
-            except Exception:
-                pass
+    lock_acquired = False
+    if Config.TRANSCRIBE_SERIALIZE_JOBS:
+        lock_acquired = _TRANSCRIBE_LOCK.acquire(blocking=False)
+        if not lock_acquired:
+            _commit_transcription(
+                gravacao,
+                status="fila",
+                progresso=gravacao.transcricao_progresso or 0,
+                cancelada=False,
+            )
+            while True:
+                if _TRANSCRIBE_LOCK.acquire(timeout=1):
+                    lock_acquired = True
+                    break
+                try:
+                    db.session.refresh(gravacao)
+                    if gravacao.transcricao_cancelada:
+                        _commit_transcription(
+                            gravacao,
+                            status="interrompido",
+                            progresso=gravacao.transcricao_progresso or 0,
+                            cancelada=True,
+                        )
+                        return False
+                except Exception:
+                    pass
 
     try:
         try:
@@ -651,10 +655,11 @@ def transcribe_gravacao(gravacao_id, *, force=False):
         )
         return False
     finally:
-        try:
-            _TRANSCRIBE_LOCK.release()
-        except Exception:
-            pass
+        if lock_acquired:
+            try:
+                _TRANSCRIBE_LOCK.release()
+            except Exception:
+                pass
         _cleanup_prepared_audio(prepared_filepath)
 
     texto = " ".join(parts).strip()

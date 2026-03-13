@@ -13,7 +13,7 @@ class Radio(db.Model):
     estado = db.Column(db.String(2))
     favorita = db.Column(db.Boolean, default=False)
     bitrate_kbps = db.Column(db.Integer, default=128)
-    output_format = db.Column(db.String(10), default='mp3')  # mp3 ou opus
+    output_format = db.Column(db.String(10), default='mp3')  # mp3, opus ou flac
     audio_mode = db.Column(db.String(10), default='stereo')  # stereo ou mono
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

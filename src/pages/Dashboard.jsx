@@ -468,6 +468,7 @@ const Dashboard = () => {
                       >
                         <option value="mp3">MP3</option>
                         <option value="opus">Opus</option>
+                        <option value="flac">FLAC</option>
                       </select>
                     </div>
                     <div className="flex flex-col">
