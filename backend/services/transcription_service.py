@@ -2,6 +2,7 @@ import json
 import os
 import queue
 import subprocess
+import tempfile
 import threading
 from collections import Counter
 
@@ -209,6 +210,130 @@ def _load_model():
     return _MODEL
 
 
+def _normalize_hint(value):
+    return " ".join(str(value or "").strip().split())
+
+
+def _build_transcription_hotwords(gravacao):
+    values = []
+    configured = _normalize_hint(Config.TRANSCRIBE_HOTWORDS)
+    if configured:
+        values.extend(part.strip() for part in configured.split(",") if part.strip())
+
+    radio = getattr(gravacao, "radio", None)
+    if radio:
+        values.extend(
+            [
+                getattr(radio, "nome", None),
+                getattr(radio, "cidade", None),
+                getattr(radio, "estado", None),
+            ]
+        )
+
+    normalized = []
+    seen = set()
+    for value in values:
+        item = _normalize_hint(value)
+        if not item:
+            continue
+        lowered = item.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        normalized.append(item)
+    return ", ".join(normalized) or None
+
+
+def _build_transcription_prompt(gravacao):
+    prompt_parts = []
+    configured = _normalize_hint(Config.TRANSCRIBE_INITIAL_PROMPT)
+    if configured:
+        prompt_parts.append(configured)
+
+    radio = getattr(gravacao, "radio", None)
+    if radio:
+        station_name = _normalize_hint(getattr(radio, "nome", None))
+        location_bits = [
+            _normalize_hint(getattr(radio, "cidade", None)),
+            _normalize_hint(getattr(radio, "estado", None)),
+        ]
+        location = " - ".join(bit for bit in location_bits if bit)
+        if station_name:
+            prompt_parts.append(f"Emissora: {station_name}.")
+        if location:
+            prompt_parts.append(f"Praca: {location}.")
+
+    return " ".join(prompt_parts).strip() or None
+
+
+def _prepare_audio_for_transcription(filepath):
+    if not filepath or not os.path.exists(filepath) or not Config.TRANSCRIBE_AUDIO_PREPROCESS:
+        return filepath, None
+
+    prepared_path = None
+
+    try:
+        fd, prepared_path = tempfile.mkstemp(prefix="transcribe_", suffix=".wav")
+        os.close(fd)
+
+        ffmpeg_cmd = [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-nostdin",
+            "-y",
+            "-i",
+            filepath,
+        ]
+
+        audio_filter = (Config.TRANSCRIBE_AUDIO_FILTER or "").strip()
+        if audio_filter:
+            ffmpeg_cmd += ["-af", audio_filter]
+
+        ffmpeg_cmd += [
+            "-ac",
+            str(max(1, int(Config.TRANSCRIBE_AUDIO_CHANNELS or 1))),
+            "-ar",
+            str(max(8000, int(Config.TRANSCRIBE_AUDIO_SAMPLE_RATE or 16000))),
+            "-c:a",
+            "pcm_s16le",
+            prepared_path,
+        ]
+
+        subprocess.run(
+            ffmpeg_cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+        if os.path.exists(prepared_path) and os.path.getsize(prepared_path) > 0:
+            return prepared_path, prepared_path
+    except Exception as exc:
+        if has_app_context():
+            try:
+                current_app.logger.warning(f"Falha ao preparar audio para transcricao: {exc}")
+            except Exception:
+                pass
+
+    try:
+        if prepared_path and os.path.exists(prepared_path):
+            os.remove(prepared_path)
+    except Exception:
+        pass
+    return filepath, None
+
+
+def _cleanup_prepared_audio(filepath):
+    if not filepath:
+        return
+    try:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+    except Exception:
+        pass
+
+
 def _probe_duration_seconds(filepath):
     if not filepath or not os.path.exists(filepath):
         return None
@@ -356,6 +481,9 @@ def transcribe_gravacao(gravacao_id, *, force=False):
         cancelada=False,
     )
 
+    prepared_filepath = None
+    transcribe_input_path = filepath
+
     acquired = _TRANSCRIBE_LOCK.acquire(blocking=False)
     if not acquired:
         _commit_transcription(
@@ -401,24 +529,37 @@ def transcribe_gravacao(gravacao_id, *, force=False):
         except Exception:
             pass
 
+        transcribe_input_path, prepared_filepath = _prepare_audio_for_transcription(filepath)
         model = _load_model()
         language = Config.TRANSCRIBE_LANGUAGE or None
+        prompt = _build_transcription_prompt(gravacao)
+        hotwords = _build_transcription_hotwords(gravacao)
         transcribe_kwargs = {
             "language": language,
             "beam_size": max(1, int(Config.TRANSCRIBE_BEAM_SIZE or 1)),
+            "best_of": max(1, int(Config.TRANSCRIBE_BEST_OF or 1)),
+            "patience": max(1.0, float(Config.TRANSCRIBE_PATIENCE or 1.0)),
+            "condition_on_previous_text": bool(Config.TRANSCRIBE_CONDITION_ON_PREVIOUS_TEXT),
+            "word_timestamps": bool(Config.TRANSCRIBE_WORD_TIMESTAMPS),
         }
-        best_of = int(Config.TRANSCRIBE_BEST_OF or 0)
-        if best_of > 0:
-            transcribe_kwargs["best_of"] = best_of
+        if prompt:
+            transcribe_kwargs["initial_prompt"] = prompt
+        if hotwords:
+            transcribe_kwargs["hotwords"] = hotwords
+        if Config.TRANSCRIBE_WORD_TIMESTAMPS and Config.TRANSCRIBE_HALLUCINATION_SILENCE_THRESHOLD is not None:
+            transcribe_kwargs["hallucination_silence_threshold"] = float(
+                Config.TRANSCRIBE_HALLUCINATION_SILENCE_THRESHOLD
+            )
         if Config.TRANSCRIBE_VAD:
             transcribe_kwargs["vad_filter"] = True
             transcribe_kwargs["vad_parameters"] = {
-                "min_silence_duration_ms": int(Config.TRANSCRIBE_VAD_MIN_SILENCE_MS or 500),
+                "min_silence_duration_ms": int(Config.TRANSCRIBE_VAD_MIN_SILENCE_MS or 2000),
+                "speech_pad_ms": int(Config.TRANSCRIBE_VAD_SPEECH_PAD_MS or 500),
             }
         chunk_length = int(Config.TRANSCRIBE_CHUNK_LENGTH or 0)
         if chunk_length > 0:
             transcribe_kwargs["chunk_length"] = chunk_length
-        segments, info = model.transcribe(filepath, **transcribe_kwargs)
+        segments, info = model.transcribe(transcribe_input_path, **transcribe_kwargs)
         detected_lang = getattr(info, "language", None)
 
         total_duration = gravacao.duracao_segundos or int(round(getattr(info, "duration", 0) or 0)) or 0
@@ -442,12 +583,26 @@ def transcribe_gravacao(gravacao_id, *, force=False):
         for segment in segments:
             text = (segment.text or "").strip()
             if text:
+                words_payload = []
+                for word in getattr(segment, "words", None) or []:
+                    word_text = (getattr(word, "word", "") or "").strip()
+                    if not word_text:
+                        continue
+                    words_payload.append({
+                        "start": float(getattr(word, "start", 0) or 0),
+                        "end": float(getattr(word, "end", 0) or 0),
+                        "word": word_text,
+                        "probability": float(getattr(word, "probability", 0) or 0),
+                    })
                 parts.append(text)
-                segments_payload.append({
+                segment_payload = {
                     "start": float(getattr(segment, "start", 0) or 0),
                     "end": float(getattr(segment, "end", 0) or 0),
                     "text": text,
-                })
+                }
+                if words_payload:
+                    segment_payload["words"] = words_payload
+                segments_payload.append(segment_payload)
 
             segment_end = getattr(segment, "end", 0) or 0
             if total_duration:
@@ -500,6 +655,7 @@ def transcribe_gravacao(gravacao_id, *, force=False):
             _TRANSCRIBE_LOCK.release()
         except Exception:
             pass
+        _cleanup_prepared_audio(prepared_filepath)
 
     texto = " ".join(parts).strip()
     if not texto:

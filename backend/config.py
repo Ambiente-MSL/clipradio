@@ -4,6 +4,43 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _env_bool(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _env_int(name, default):
+    value = os.getenv(name)
+    if value in (None, ""):
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _env_float(name, default=None, *, allow_none=False):
+    value = os.getenv(name)
+    if value in (None, ""):
+        return default
+    if allow_none and str(value).strip().lower() in {"none", "null"}:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _env_str(name, default=None):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    normalized = str(value).strip()
+    return normalized or default
+
 class Config:
     # Database
     import urllib.parse
@@ -75,24 +112,42 @@ class Config:
     except (TypeError, ValueError):
         AUDIO_STREAM_MAX_AGE_DAYS = 30
 
-    TRANSCRIBE_ENABLED = os.getenv('TRANSCRIBE_ENABLED', 'true').lower() == 'true'
-    TRANSCRIBE_MODEL = os.getenv('TRANSCRIBE_MODEL', 'small')
-    TRANSCRIBE_LANGUAGE = os.getenv('TRANSCRIBE_LANGUAGE', 'pt')
-    TRANSCRIBE_DEVICE = os.getenv('TRANSCRIBE_DEVICE', 'cpu')
-    TRANSCRIBE_COMPUTE_TYPE = os.getenv('TRANSCRIBE_COMPUTE_TYPE', 'int8')
-    TRANSCRIBE_BEAM_SIZE = int(os.getenv('TRANSCRIBE_BEAM_SIZE', '5') or 5)
-    TRANSCRIBE_BEST_OF = int(os.getenv('TRANSCRIBE_BEST_OF', '5') or 5)
-    TRANSCRIBE_VAD = os.getenv('TRANSCRIBE_VAD', 'true').lower() == 'true'
-    TRANSCRIBE_VAD_MIN_SILENCE_MS = int(os.getenv('TRANSCRIBE_VAD_MIN_SILENCE_MS', '500') or 500)
-    TRANSCRIBE_CHUNK_LENGTH = int(os.getenv('TRANSCRIBE_CHUNK_LENGTH', '30') or 30)
-    TRANSCRIBE_TEXT_UPDATE_SECONDS = int(os.getenv('TRANSCRIBE_TEXT_UPDATE_SECONDS', '10') or 10)
-    TRANSCRIBE_MAX_CONCURRENT = int(os.getenv('TRANSCRIBE_MAX_CONCURRENT', '1') or 1)
+    TRANSCRIBE_ENABLED = _env_bool('TRANSCRIBE_ENABLED', True)
+    TRANSCRIBE_MODEL = _env_str('TRANSCRIBE_MODEL', 'small')
+    TRANSCRIBE_LANGUAGE = _env_str('TRANSCRIBE_LANGUAGE', 'pt')
+    TRANSCRIBE_DEVICE = _env_str('TRANSCRIBE_DEVICE', 'cpu')
+    TRANSCRIBE_COMPUTE_TYPE = _env_str('TRANSCRIBE_COMPUTE_TYPE', 'int8')
+    TRANSCRIBE_BEAM_SIZE = _env_int('TRANSCRIBE_BEAM_SIZE', 5)
+    TRANSCRIBE_BEST_OF = _env_int('TRANSCRIBE_BEST_OF', 5)
+    TRANSCRIBE_PATIENCE = _env_float('TRANSCRIBE_PATIENCE', 1.2)
+    TRANSCRIBE_CONDITION_ON_PREVIOUS_TEXT = _env_bool('TRANSCRIBE_CONDITION_ON_PREVIOUS_TEXT', True)
+    TRANSCRIBE_INITIAL_PROMPT = _env_str('TRANSCRIBE_INITIAL_PROMPT')
+    TRANSCRIBE_HOTWORDS = _env_str('TRANSCRIBE_HOTWORDS')
+    TRANSCRIBE_WORD_TIMESTAMPS = _env_bool('TRANSCRIBE_WORD_TIMESTAMPS', True)
+    TRANSCRIBE_HALLUCINATION_SILENCE_THRESHOLD = _env_float(
+        'TRANSCRIBE_HALLUCINATION_SILENCE_THRESHOLD',
+        2.0,
+        allow_none=True,
+    )
+    TRANSCRIBE_VAD = _env_bool('TRANSCRIBE_VAD', True)
+    TRANSCRIBE_VAD_MIN_SILENCE_MS = _env_int('TRANSCRIBE_VAD_MIN_SILENCE_MS', 2000)
+    TRANSCRIBE_VAD_SPEECH_PAD_MS = _env_int('TRANSCRIBE_VAD_SPEECH_PAD_MS', 500)
+    TRANSCRIBE_CHUNK_LENGTH = _env_int('TRANSCRIBE_CHUNK_LENGTH', 30)
+    TRANSCRIBE_AUDIO_PREPROCESS = _env_bool('TRANSCRIBE_AUDIO_PREPROCESS', True)
+    TRANSCRIBE_AUDIO_SAMPLE_RATE = _env_int('TRANSCRIBE_AUDIO_SAMPLE_RATE', 16000)
+    TRANSCRIBE_AUDIO_CHANNELS = _env_int('TRANSCRIBE_AUDIO_CHANNELS', 1)
+    TRANSCRIBE_AUDIO_FILTER = _env_str(
+        'TRANSCRIBE_AUDIO_FILTER',
+        'highpass=f=80,lowpass=f=7600,loudnorm=I=-16:LRA=11:TP=-1.5',
+    )
+    TRANSCRIBE_TEXT_UPDATE_SECONDS = _env_int('TRANSCRIBE_TEXT_UPDATE_SECONDS', 10)
+    TRANSCRIBE_MAX_CONCURRENT = _env_int('TRANSCRIBE_MAX_CONCURRENT', 1)
 
-    FFMPEG_THREADS = int(os.getenv('FFMPEG_THREADS', '0') or 0)
+    FFMPEG_THREADS = _env_int('FFMPEG_THREADS', 0)
 
-    STREAM_VALIDATE_ON_SCHEDULE = os.getenv('STREAM_VALIDATE_ON_SCHEDULE', 'true').lower() == 'true'
-    STREAM_VALIDATE_ON_EXECUTE = os.getenv('STREAM_VALIDATE_ON_EXECUTE', 'true').lower() == 'true'
-    STREAM_VALIDATE_TIMEOUT_SECONDS = int(os.getenv('STREAM_VALIDATE_TIMEOUT_SECONDS', '8') or 8)
+    STREAM_VALIDATE_ON_SCHEDULE = _env_bool('STREAM_VALIDATE_ON_SCHEDULE', True)
+    STREAM_VALIDATE_ON_EXECUTE = _env_bool('STREAM_VALIDATE_ON_EXECUTE', True)
+    STREAM_VALIDATE_TIMEOUT_SECONDS = _env_int('STREAM_VALIDATE_TIMEOUT_SECONDS', 8)
     
     @staticmethod
     def init_app(app):
