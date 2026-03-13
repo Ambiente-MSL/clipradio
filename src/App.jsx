@@ -15,6 +15,7 @@ const GravadorManual = lazy(() => import('@/pages/GravadorManual'));
 const Login = lazy(() => import('@/pages/Login'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const Tags = lazy(() => import('@/pages/Tags'));
+const NuvemPalavras = lazy(() => import('@/pages/NuvemPalavras'));
 const SystemStatus = lazy(() => import('@/pages/SystemStatus'));
 const Admin = lazy(() => import('@/pages/Admin'));
 
@@ -56,6 +57,7 @@ function App() {
               <Route path="/gravador-manual" element={<ProtectedRoute><GravadorManual /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/tags" element={<ProtectedRoute><Tags /></ProtectedRoute>} />
+              <Route path="/nuvem-palavras" element={<ProtectedRoute><NuvemPalavras /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
               <Route path="/status" element={<ProtectedRoute><SystemStatus /></ProtectedRoute>} />
               <Route path="*" element={<Navigate to="/dashboard" />} />

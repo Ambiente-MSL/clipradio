@@ -1,14 +1,33 @@
+import re
+from datetime import timedelta
+
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func
+from sqlalchemy.orm import load_only, selectinload
 from app import db
 from models.tag import Tag
 from models.gravacao import Gravacao
-from models.gravacao_tag import gravacao_tags
+from models.radio import Radio
 from models.user import User
+from services.transcription_service import get_transcription_segments
 from utils.jwt_utils import token_required, decode_token
 from flask import request as flask_request
 
 bp = Blueprint('tags', __name__)
+
+TAG_CLOUD_GRAVACAO_FIELDS = (
+    Gravacao.id,
+    Gravacao.user_id,
+    Gravacao.radio_id,
+    Gravacao.criado_em,
+    Gravacao.transcricao_status,
+    Gravacao.transcricao_texto,
+)
+TAG_CLOUD_RADIO_FIELDS = (
+    Radio.nome,
+    Radio.cidade,
+    Radio.estado,
+)
 
 def get_user_ctx():
     token = flask_request.headers.get('Authorization', '').replace('Bearer ', '')
@@ -18,26 +37,166 @@ def get_user_ctx():
         'is_admin': payload.get('is_admin', False),
     }
 
+
+def _normalize_tag_name(value):
+    return " ".join(str(value or "").strip().split())
+
+
+def _resolve_visible_tags(ctx):
+    user_id = ctx.get('user_id')
+    if ctx.get('is_admin'):
+        return Tag.query.order_by(Tag.criado_em.desc()).all()
+
+    user = User.query.get(user_id)
+    user_city = (user.cidade or '').strip() if user else ''
+    if not user_city:
+        return Tag.query.filter_by(user_id=user_id).order_by(Tag.criado_em.desc()).all()
+
+    return (
+        Tag.query
+        .join(User, Tag.user_id == User.id)
+        .filter(func.lower(User.cidade) == user_city.lower())
+        .order_by(Tag.criado_em.desc())
+        .all()
+    )
+
+
+def _build_tag_cloud_entries(tags):
+    entries = {}
+    for tag in tags or []:
+        normalized_name = _normalize_tag_name(getattr(tag, 'nome', None))
+        if not normalized_name:
+            continue
+
+        key = normalized_name.lower()
+        current = entries.get(key)
+        if current is None:
+            entries[key] = {
+                'key': key,
+                'text': normalized_name,
+                'color': getattr(tag, 'cor', None),
+                'source_tag_ids': [tag.id],
+                'pattern': re.compile(rf"\b{re.escape(normalized_name)}\b", re.IGNORECASE),
+                'count': 0,
+                'recording_ids': set(),
+                'radios': set(),
+                'cities': set(),
+                'occurrences': [],
+            }
+            continue
+
+        current['source_tag_ids'].append(tag.id)
+        if not current.get('color') and getattr(tag, 'cor', None):
+            current['color'] = tag.cor
+
+    return entries
+
+
+def _word_time_offsets(segment, tag_text):
+    words = segment.get('words') if isinstance(segment, dict) else None
+    if not isinstance(words, list) or " " in str(tag_text or "").strip():
+        return []
+
+    normalized_target = re.sub(r"(^[^\w]+|[^\w]+$)", "", str(tag_text or "").strip(), flags=re.UNICODE).lower()
+    if not normalized_target:
+        return []
+
+    offsets = []
+    for word in words:
+        normalized_word = re.sub(
+            r"(^[^\w]+|[^\w]+$)",
+            "",
+            str((word or {}).get('word') or '').strip(),
+            flags=re.UNICODE,
+        ).lower()
+        if normalized_word == normalized_target:
+            try:
+                offsets.append(float((word or {}).get('start') or 0))
+            except Exception:
+                continue
+    return offsets
+
+
+def _build_occurrence(entry, gravacao, radio, *, offset_seconds=None, count=1, exact_time=False):
+    heard_at = None
+    if gravacao.criado_em is not None and offset_seconds is not None:
+        try:
+            heard_at = gravacao.criado_em + timedelta(seconds=float(offset_seconds))
+        except Exception:
+            heard_at = None
+
+    radio_name = getattr(radio, 'nome', None) if radio else None
+    city_name = getattr(radio, 'cidade', None) if radio else None
+    state_name = getattr(radio, 'estado', None) if radio else None
+
+    return {
+        'tag_key': entry['key'],
+        'tag_text': entry['text'],
+        'gravacao_id': gravacao.id,
+        'radio_id': gravacao.radio_id,
+        'radio_nome': radio_name,
+        'cidade': city_name,
+        'estado': state_name,
+        'count': int(count or 1),
+        'offset_seconds': float(offset_seconds) if offset_seconds is not None else None,
+        'heard_at': heard_at.isoformat() if heard_at else None,
+        'exact_time': bool(exact_time and offset_seconds is not None),
+        'recorded_at': gravacao.criado_em.isoformat() if gravacao.criado_em else None,
+    }
+
+
+def _accumulate_segment_matches(entry, gravacao, radio, segment):
+    segment_text = str((segment or {}).get('text') or '')
+    if not segment_text:
+        return 0
+
+    matches = list(entry['pattern'].finditer(segment_text))
+    if not matches:
+        return 0
+
+    start_seconds = None
+    try:
+        start_seconds = float((segment or {}).get('start') or 0)
+    except Exception:
+        start_seconds = 0.0
+
+    word_offsets = _word_time_offsets(segment, entry['text'])
+    for index, _ in enumerate(matches):
+        offset_seconds = word_offsets[index] if index < len(word_offsets) else start_seconds
+        entry['occurrences'].append(
+            _build_occurrence(
+                entry,
+                gravacao,
+                radio,
+                offset_seconds=offset_seconds,
+                exact_time=index < len(word_offsets),
+            )
+        )
+    return len(matches)
+
+
+def _accumulate_text_only_matches(entry, gravacao, radio, text):
+    matches = list(entry['pattern'].finditer(str(text or '')))
+    if not matches:
+        return 0
+
+    entry['occurrences'].append(
+        _build_occurrence(
+            entry,
+            gravacao,
+            radio,
+            offset_seconds=None,
+            count=len(matches),
+            exact_time=False,
+        )
+    )
+    return len(matches)
+
 @bp.route('', methods=['GET'])
 @token_required
 def get_tags():
     ctx = get_user_ctx()
-    user_id = ctx.get('user_id')
-    if ctx.get('is_admin'):
-        tags = Tag.query.order_by(Tag.criado_em.desc()).all()
-    else:
-        user = User.query.get(user_id)
-        user_city = (user.cidade or '').strip() if user else ''
-        if not user_city:
-            tags = Tag.query.filter_by(user_id=user_id).order_by(Tag.criado_em.desc()).all()
-        else:
-            tags = (
-                Tag.query
-                .join(User, Tag.user_id == User.id)
-                .filter(func.lower(User.cidade) == user_city.lower())
-                .order_by(Tag.criado_em.desc())
-                .all()
-            )
+    tags = _resolve_visible_tags(ctx)
     return jsonify([tag.to_dict() for tag in tags]), 200
 
 @bp.route('/<tag_id>', methods=['GET'])
@@ -160,4 +319,143 @@ def remove_tag_from_gravacao(gravacao_id, tag_id):
         db.session.commit()
     
     return jsonify({'message': 'Tag removed from gravacao'}), 200
+
+
+@bp.route('/cloud', methods=['GET'])
+@token_required
+def get_tags_cloud():
+    ctx = get_user_ctx()
+    user_id = ctx.get('user_id')
+    is_admin = ctx.get('is_admin', False)
+
+    try:
+        occurrence_limit = int(request.args.get('occurrence_limit', 1500) or 1500)
+    except (TypeError, ValueError):
+        occurrence_limit = 1500
+    occurrence_limit = max(100, min(5000, occurrence_limit))
+
+    visible_tags = _resolve_visible_tags(ctx)
+    tag_entries = _build_tag_cloud_entries(visible_tags)
+    if not tag_entries:
+        return jsonify({
+            'summary': {
+                'total_tags': 0,
+                'matched_tags': 0,
+                'total_occurrences': 0,
+                'recordings_scanned': 0,
+                'recordings_with_matches': 0,
+                'occurrences_returned': 0,
+                'occurrences_truncated': False,
+            },
+            'words': [],
+            'occurrences': [],
+        }), 200
+
+    query = (
+        Gravacao.query
+        .filter(Gravacao.transcricao_status == 'concluido')
+        .filter(Gravacao.transcricao_texto.isnot(None))
+        .filter(Gravacao.transcricao_texto != '')
+        .options(
+            load_only(*TAG_CLOUD_GRAVACAO_FIELDS),
+            selectinload(Gravacao.radio).load_only(*TAG_CLOUD_RADIO_FIELDS),
+        )
+        .order_by(Gravacao.criado_em.desc())
+    )
+    if not is_admin:
+        query = query.filter(Gravacao.user_id == user_id)
+
+    gravacoes = query.all()
+    recordings_with_matches = set()
+
+    for gravacao in gravacoes:
+        radio = getattr(gravacao, 'radio', None)
+        segments = get_transcription_segments(gravacao.id)
+        has_segments = isinstance(segments, list) and len(segments) > 0
+
+        for entry in tag_entries.values():
+            match_count = 0
+            if has_segments:
+                for segment in segments:
+                    match_count += _accumulate_segment_matches(entry, gravacao, radio, segment)
+            else:
+                match_count += _accumulate_text_only_matches(entry, gravacao, radio, gravacao.transcricao_texto)
+
+            if match_count <= 0:
+                continue
+
+            entry['count'] += match_count
+            entry['recording_ids'].add(gravacao.id)
+            recordings_with_matches.add(gravacao.id)
+            if radio and getattr(radio, 'nome', None):
+                entry['radios'].add(radio.nome)
+            if radio and getattr(radio, 'cidade', None):
+                entry['cities'].add(radio.cidade)
+
+    flat_occurrences = []
+    occurrences_truncated = False
+    for entry in tag_entries.values():
+        sorted_occurrences = sorted(
+            entry['occurrences'],
+            key=lambda item: (
+                item.get('heard_at') or '',
+                item.get('recorded_at') or '',
+                item.get('radio_nome') or '',
+            ),
+            reverse=True,
+        )
+        entry['occurrences'] = sorted_occurrences
+        remaining = occurrence_limit - len(flat_occurrences)
+        if remaining > 0:
+            flat_occurrences.extend(sorted_occurrences[:remaining])
+            if len(sorted_occurrences) > remaining:
+                occurrences_truncated = True
+        elif sorted_occurrences:
+            occurrences_truncated = True
+
+    words = []
+    total_occurrences = 0
+    matched_tags = 0
+    for entry in tag_entries.values():
+        total_occurrences += entry['count']
+        if entry['count'] > 0:
+            matched_tags += 1
+
+        words.append({
+            'key': entry['key'],
+            'text': entry['text'],
+            'color': entry.get('color'),
+            'count': entry['count'],
+            'recordings_count': len(entry['recording_ids']),
+            'radios_count': len(entry['radios']),
+            'cities_count': len(entry['cities']),
+            'source_tag_ids': entry['source_tag_ids'],
+            'last_heard_at': entry['occurrences'][0]['heard_at'] if entry['occurrences'] else None,
+            'sample_occurrences': entry['occurrences'][:5],
+        })
+
+    words.sort(key=lambda item: (-item['count'], item['text'].lower()))
+    flat_occurrences.sort(
+        key=lambda item: (
+            item.get('heard_at') or '',
+            item.get('recorded_at') or '',
+            item.get('tag_text') or '',
+        ),
+        reverse=True,
+    )
+
+    return jsonify({
+        'summary': {
+            'total_tags': len(words),
+            'matched_tags': matched_tags,
+            'total_occurrences': total_occurrences,
+            'recordings_scanned': len(gravacoes),
+            'recordings_with_matches': len(recordings_with_matches),
+            'occurrences_returned': len(flat_occurrences),
+            'occurrence_limit': occurrence_limit,
+            'occurrences_truncated': occurrences_truncated,
+        },
+        'words': words,
+        'occurrences': flat_occurrences,
+    }), 200
 

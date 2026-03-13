@@ -353,6 +353,13 @@ class ApiClient {
     });
   }
 
+  async getTagsCloud({ occurrenceLimit } = {}) {
+    const params = new URLSearchParams();
+    if (occurrenceLimit != null) params.append('occurrence_limit', occurrenceLimit);
+    const query = params.toString();
+    return this.request(`/tags/cloud${query ? `?${query}` : ''}`);
+  }
+
   async addTagToGravacao(gravacaoId, tagId) {
     return this.request(`/tags/gravacao/${gravacaoId}`, {
       method: 'POST',
