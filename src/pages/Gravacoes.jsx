@@ -1137,6 +1137,10 @@ const GravacaoItem = ({
     && ['processando', 'fila'].includes(transcriptionData.status);
   const transcriptionProgress = Number(gravacao?.transcricao_progresso ?? transcriptionData.progresso ?? 0);
   const normalizedTranscriptionProgress = Number.isFinite(transcriptionProgress) ? transcriptionProgress : 0;
+  const normalizedTranscriptionStatus = String(
+    transcriptionData.status || gravacao?.transcricao_status || ''
+  ).toLowerCase();
+  const isTranscriptionInProgress = ['processando', 'fila', 'interrompendo'].includes(normalizedTranscriptionStatus);
   const hasTranscription = Boolean(gravacao?.transcricao_disponivel)
     || normalizedTranscriptionProgress >= 100
     || transcriptionData.status === 'concluido'
@@ -1321,7 +1325,7 @@ const GravacaoItem = ({
           )}
 
           <Button size="icon" variant="ghost" className="h-9 w-9" onClick={handleStartTranscription} disabled={!gravacao.arquivo_url} title="Transcrever">
-            <FileText className={`w-5 h-5 ${hasTranscription ? 'text-emerald-400' : 'text-white'}`} />
+            <FileText className={`w-5 h-5 ${hasTranscription ? 'text-emerald-400' : isTranscriptionInProgress ? 'text-amber-400' : 'text-white'}`} />
           </Button>
           <Button
             size="icon"

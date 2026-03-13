@@ -1,0 +1,32 @@
+# Preset alta fidelidade
+# Objetivo: maximizar aderencia ao que foi falado, aceitando maior tempo de processamento.
+# Recomendado para radios criticas, nomes proprios, numeros, entrevistas e auditoria.
+# Cole estas linhas no .env.production para ativar.
+
+TRANSCRIBE_ENABLED=true
+TRANSCRIBE_MODEL=medium
+TRANSCRIBE_LANGUAGE=pt
+TRANSCRIBE_DEVICE=cpu
+TRANSCRIBE_COMPUTE_TYPE=int8
+TRANSCRIBE_CPU_THREADS=4
+TRANSCRIBE_MODEL_WORKERS=1
+TRANSCRIBE_MAX_CONCURRENT=1
+TRANSCRIBE_SERIALIZE_JOBS=true
+TRANSCRIBE_BEAM_SIZE=6
+TRANSCRIBE_BEST_OF=6
+TRANSCRIBE_PATIENCE=1.3
+TRANSCRIBE_CONDITION_ON_PREVIOUS_TEXT=true
+TRANSCRIBE_INITIAL_PROMPT=Transcreva literalmente o audio de radio em portugues do Brasil, preservando nomes proprios, marcas, siglas, numeros, interjeicoes e repeticoes. Nao resuma nem reescreva.
+TRANSCRIBE_HOTWORDS=
+TRANSCRIBE_WORD_TIMESTAMPS=true
+TRANSCRIBE_HALLUCINATION_SILENCE_THRESHOLD=2
+TRANSCRIBE_VAD=true
+TRANSCRIBE_VAD_MIN_SILENCE_MS=2200
+TRANSCRIBE_VAD_SPEECH_PAD_MS=550
+TRANSCRIBE_CHUNK_LENGTH=30
+TRANSCRIBE_AUDIO_PREPROCESS=true
+TRANSCRIBE_AUDIO_SAMPLE_RATE=16000
+TRANSCRIBE_AUDIO_CHANNELS=1
+TRANSCRIBE_AUDIO_FILTER=highpass=f=80,lowpass=f=7600,loudnorm=I=-16:LRA=11:TP=-1.5
+TRANSCRIBE_TEXT_UPDATE_SECONDS=20
+FFMPEG_THREADS=1

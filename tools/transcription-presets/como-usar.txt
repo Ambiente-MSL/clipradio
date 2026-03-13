@@ -1,0 +1,15 @@
+1. Escolha um dos presets desta pasta.
+2. Copie apenas as variaveis do preset para o arquivo .env.production.
+3. Recrie o backend para aplicar:
+   docker compose up -d --build backend
+4. Reprocese uma gravacao curta e compare tempo x fidelidade.
+
+Leitura rapida:
+- preset-rapido.txt: melhor throughput; menor custo por transcricao; menor fidelidade.
+- preset-alta-fidelidade.txt: melhor aderencia ao audio; maior tempo de fila e CPU.
+
+Recomendacao operacional:
+- Se a prioridade for velocidade, use preset-rapido.
+- Se a prioridade for qualidade, use preset-alta-fidelidade.
+- Para a melhor captura de audio, cadastre radios novas com formato FLAC na interface.
+- Se o preset-alta-fidelidade ficar lento demais, troque apenas TRANSCRIBE_MODEL=medium por TRANSCRIBE_MODEL=small.
