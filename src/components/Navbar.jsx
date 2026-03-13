@@ -15,7 +15,7 @@ const baseNavItems = [
   { name: 'Gravações', path: '/gravacoes', icon: FileText },
   { name: 'Gravar manual', path: '/gravador-manual', icon: Mic },
   { name: 'Tags', path: '/tags', icon: Tag },
-  { name: 'Nuvem', path: '/nuvem-palavras', icon: Cloud },
+  { name: 'Nuvem de tags', path: '/nuvem-palavras', icon: Cloud },
 ];
 const adminNavItems = [
   { name: 'Admin', path: '/admin', icon: Shield },
