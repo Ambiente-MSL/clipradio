@@ -1,4 +1,5 @@
 import re
+from collections import Counter, defaultdict
 from datetime import timedelta
 
 from flask import Blueprint, request, jsonify
@@ -42,6 +43,10 @@ def _normalize_tag_name(value):
     return " ".join(str(value or "").strip().split())
 
 
+def _normalize_tag_key(value):
+    return _normalize_tag_name(value).lower()
+
+
 def _resolve_visible_tags(ctx):
     user_id = ctx.get('user_id')
     if ctx.get('is_admin'):
@@ -68,7 +73,7 @@ def _build_tag_cloud_entries(tags):
         if not normalized_name:
             continue
 
-        key = normalized_name.lower()
+        key = _normalize_tag_key(normalized_name)
         current = entries.get(key)
         if current is None:
             entries[key] = {
@@ -76,7 +81,7 @@ def _build_tag_cloud_entries(tags):
                 'text': normalized_name,
                 'color': getattr(tag, 'cor', None),
                 'source_tag_ids': [tag.id],
-                'pattern': re.compile(rf"\b{re.escape(normalized_name)}\b", re.IGNORECASE),
+                'single_word': " " not in normalized_name,
                 'count': 0,
                 'recording_ids': set(),
                 'radios': set(),
@@ -92,28 +97,35 @@ def _build_tag_cloud_entries(tags):
     return entries
 
 
-def _word_time_offsets(segment, tag_text):
+def _build_combined_tag_pattern(entries):
+    tag_texts = sorted(
+        (re.escape(entry['text']) for entry in entries.values()),
+        key=len,
+        reverse=True,
+    )
+    if not tag_texts:
+        return None
+    return re.compile(rf"(?=(\b(?:{'|'.join(tag_texts)})\b))", re.IGNORECASE)
+
+
+def _normalize_word_token(value):
+    return re.sub(r"(^[^\w]+|[^\w]+$)", "", str(value or "").strip(), flags=re.UNICODE).lower()
+
+
+def _build_segment_word_offsets(segment):
     words = segment.get('words') if isinstance(segment, dict) else None
-    if not isinstance(words, list) or " " in str(tag_text or "").strip():
-        return []
+    if not isinstance(words, list):
+        return {}
 
-    normalized_target = re.sub(r"(^[^\w]+|[^\w]+$)", "", str(tag_text or "").strip(), flags=re.UNICODE).lower()
-    if not normalized_target:
-        return []
-
-    offsets = []
+    offsets = defaultdict(list)
     for word in words:
-        normalized_word = re.sub(
-            r"(^[^\w]+|[^\w]+$)",
-            "",
-            str((word or {}).get('word') or '').strip(),
-            flags=re.UNICODE,
-        ).lower()
-        if normalized_word == normalized_target:
-            try:
-                offsets.append(float((word or {}).get('start') or 0))
-            except Exception:
-                continue
+        normalized_word = _normalize_word_token((word or {}).get('word'))
+        if not normalized_word:
+            continue
+        try:
+            offsets[normalized_word].append(float((word or {}).get('start') or 0))
+        except Exception:
+            continue
     return offsets
 
 
@@ -145,52 +157,101 @@ def _build_occurrence(entry, gravacao, radio, *, offset_seconds=None, count=1, e
     }
 
 
-def _accumulate_segment_matches(entry, gravacao, radio, segment):
+def _register_entry_match(entry, gravacao, radio):
+    entry['recording_ids'].add(gravacao.id)
+    if radio and getattr(radio, 'nome', None):
+        entry['radios'].add(radio.nome)
+    if radio and getattr(radio, 'cidade', None):
+        entry['cities'].add(radio.cidade)
+
+
+def _accumulate_segment_matches(entries, pattern, gravacao, radio, segment):
+    if pattern is None:
+        return 0
+
     segment_text = str((segment or {}).get('text') or '')
     if not segment_text:
         return 0
 
-    matches = list(entry['pattern'].finditer(segment_text))
+    matches = list(pattern.finditer(segment_text))
     if not matches:
         return 0
 
-    start_seconds = None
     try:
         start_seconds = float((segment or {}).get('start') or 0)
     except Exception:
         start_seconds = 0.0
 
-    word_offsets = _word_time_offsets(segment, entry['text'])
-    for index, _ in enumerate(matches):
-        offset_seconds = word_offsets[index] if index < len(word_offsets) else start_seconds
+    word_offsets = _build_segment_word_offsets(segment)
+    word_offset_indexes = defaultdict(int)
+    matched_count = 0
+
+    for match in matches:
+        matched_text = match.group(1)
+        matched_key = _normalize_tag_key(matched_text)
+        entry = entries.get(matched_key)
+        if entry is None:
+            continue
+
+        offset_seconds = start_seconds
+        exact_time = False
+        if entry.get('single_word'):
+            normalized_word = _normalize_word_token(matched_text)
+            offsets = word_offsets.get(normalized_word) or []
+            offset_index = word_offset_indexes[normalized_word]
+            if offset_index < len(offsets):
+                offset_seconds = offsets[offset_index]
+                word_offset_indexes[normalized_word] = offset_index + 1
+                exact_time = True
+
         entry['occurrences'].append(
             _build_occurrence(
                 entry,
                 gravacao,
                 radio,
                 offset_seconds=offset_seconds,
-                exact_time=index < len(word_offsets),
+                exact_time=exact_time,
             )
         )
-    return len(matches)
+        entry['count'] += 1
+        _register_entry_match(entry, gravacao, radio)
+        matched_count += 1
+
+    return matched_count
 
 
-def _accumulate_text_only_matches(entry, gravacao, radio, text):
-    matches = list(entry['pattern'].finditer(str(text or '')))
+def _accumulate_text_only_matches(entries, pattern, gravacao, radio, text):
+    if pattern is None:
+        return 0
+
+    matches = list(pattern.finditer(str(text or '')))
     if not matches:
         return 0
 
-    entry['occurrences'].append(
-        _build_occurrence(
-            entry,
-            gravacao,
-            radio,
-            offset_seconds=None,
-            count=len(matches),
-            exact_time=False,
+    counts = Counter()
+    for match in matches:
+        matched_key = _normalize_tag_key(match.group(1))
+        if matched_key in entries:
+            counts[matched_key] += 1
+
+    total_matches = 0
+    for key, count in counts.items():
+        entry = entries[key]
+        entry['occurrences'].append(
+            _build_occurrence(
+                entry,
+                gravacao,
+                radio,
+                offset_seconds=None,
+                count=count,
+                exact_time=False,
+            )
         )
-    )
-    return len(matches)
+        entry['count'] += count
+        _register_entry_match(entry, gravacao, radio)
+        total_matches += count
+
+    return total_matches
 
 @bp.route('', methods=['GET'])
 @token_required
@@ -350,6 +411,7 @@ def get_tags_cloud():
             'words': [],
             'occurrences': [],
         }), 200
+    tag_pattern = _build_combined_tag_pattern(tag_entries)
 
     query = (
         Gravacao.query
@@ -370,27 +432,28 @@ def get_tags_cloud():
 
     for gravacao in gravacoes:
         radio = getattr(gravacao, 'radio', None)
+        transcript_text = gravacao.transcricao_texto or ''
+        if not transcript_text or tag_pattern.search(transcript_text) is None:
+            continue
+
         segments = get_transcription_segments(gravacao.id)
         has_segments = isinstance(segments, list) and len(segments) > 0
+        matched_in_recording = 0
 
-        for entry in tag_entries.values():
-            match_count = 0
-            if has_segments:
-                for segment in segments:
-                    match_count += _accumulate_segment_matches(entry, gravacao, radio, segment)
-            else:
-                match_count += _accumulate_text_only_matches(entry, gravacao, radio, gravacao.transcricao_texto)
+        if has_segments:
+            for segment in segments:
+                matched_in_recording += _accumulate_segment_matches(tag_entries, tag_pattern, gravacao, radio, segment)
+        else:
+            matched_in_recording += _accumulate_text_only_matches(
+                tag_entries,
+                tag_pattern,
+                gravacao,
+                radio,
+                transcript_text,
+            )
 
-            if match_count <= 0:
-                continue
-
-            entry['count'] += match_count
-            entry['recording_ids'].add(gravacao.id)
+        if matched_in_recording > 0:
             recordings_with_matches.add(gravacao.id)
-            if radio and getattr(radio, 'nome', None):
-                entry['radios'].add(radio.nome)
-            if radio and getattr(radio, 'cidade', None):
-                entry['cities'].add(radio.cidade)
 
     flat_occurrences = []
     occurrences_truncated = False
