@@ -16,6 +16,7 @@ npm-debug.log*
 
 # Dependências
 node_modules/
+dist/
 backend/venv/
 backend/__pycache__/
 
