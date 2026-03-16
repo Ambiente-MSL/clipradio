@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Helmet } from 'react-helmet';
+import useRevalidateOnFocus from '@/hooks/useRevalidateOnFocus';
 
 const formatDuration = (seconds) => {
   if (!seconds || seconds <= 0) return '0h 00m';
@@ -39,14 +40,14 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const fetchStats = useCallback(async () => {
+  const fetchStats = useCallback(async (signal) => {
     if (!user) return;
     setLoadingStats(true);
     try {
       const [radiosData, agendamentosData, gravacoesData] = await Promise.all([
-        apiClient.getRadios(),
-        apiClient.getAgendamentos({ status: 'agendado' }),
-        apiClient.getGravacoes({ page: 1, perPage: 1 }),
+        apiClient.getRadios({ signal }),
+        apiClient.getAgendamentos({ status: 'agendado' }, { signal }),
+        apiClient.getGravacoes({ page: 1, perPage: 1 }, { signal }),
       ]);
 
       const ativos = (agendamentosData || []).filter((ag) => ag.status === 'agendado');
@@ -63,18 +64,21 @@ const Dashboard = () => {
         gravacoes: gravacoesData?.meta?.total ?? gravacoesData?.items?.length ?? 0,
       });
     } catch (error) {
+      if (error?.name === 'AbortError') return;
       toast({ title: 'Erro ao buscar estatísticas', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoadingStats(false);
     }
-    setLoadingStats(false);
   }, [user, toast]);
 
-  const fetchAdminStats = useCallback(async () => {
+  const fetchAdminStats = useCallback(async (signal) => {
     if (!user || !user.is_admin) return;
     setLoadingAdminStats(true);
     try {
-      const data = await apiClient.getAdminQuickStats();
+      const data = await apiClient.getAdminQuickStats({ signal });
       setAdminStats(data);
     } catch (error) {
+      if (error?.name === 'AbortError') return;
       // Silenciosamente falha se não for admin
       setAdminStats(null);
     } finally {
@@ -84,10 +88,18 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (user) {
-      fetchStats();
-      fetchAdminStats();
+      const controller = new AbortController();
+      fetchStats(controller.signal);
+      fetchAdminStats(controller.signal);
+      return () => controller.abort();
     }
+    return undefined;
   }, [user, fetchStats, fetchAdminStats]);
+
+  useRevalidateOnFocus(() => {
+    fetchStats();
+    fetchAdminStats();
+  }, { enabled: Boolean(user) });
 
   // Validação do stream URL
   useEffect(() => {

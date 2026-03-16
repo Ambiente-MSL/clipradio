@@ -13,6 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatInTimeZone } from 'date-fns-tz';
 import AgendamentoForm from '@/components/AgendamentoForm';
+import useRevalidateOnFocus from '@/hooks/useRevalidateOnFocus';
 
 const Agendamentos = () => {
   const [agendamentos, setAgendamentos] = useState([]);
@@ -28,23 +29,32 @@ const Agendamentos = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const fetchAgendamentos = useCallback(async () => {
+  const fetchAgendamentos = useCallback(async (signal) => {
     if (!user) return;
     setLoading(true);
     try {
-      const data = await apiClient.getAgendamentos();
+      const data = await apiClient.getAgendamentos({}, { signal });
       setAgendamentos(data || []);
     } catch (error) {
+      if (error?.name === 'AbortError') return;
       toast({ title: "Erro ao buscar agendamentos", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [toast, user]);
 
   useEffect(() => {
     if (user) {
-      fetchAgendamentos();
+      const controller = new AbortController();
+      fetchAgendamentos(controller.signal);
+      return () => controller.abort();
     }
+    return undefined;
   }, [user, fetchAgendamentos]);
+
+  useRevalidateOnFocus(() => {
+    fetchAgendamentos();
+  }, { enabled: Boolean(user) });
 
   const handleDelete = async (id) => {
     setIsDeleting(true);

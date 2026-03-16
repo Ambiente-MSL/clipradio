@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import useRevalidateOnFocus from '@/hooks/useRevalidateOnFocus'
 
 const extractStreamUrl = (text, extension) => {
   const content = String(text || '')
@@ -142,25 +143,36 @@ const CadastroRadios = () => {
     }, 800)
   }, [clearPlaybackErrorTimeout, toast])
 
-  const fetchRadios = useCallback(async () => {
+  const fetchRadios = useCallback(async (signal) => {
     setLoading(true)
     try {
       const [radiosData, agData] = await Promise.all([
-        apiClient.getRadios(),
-        apiClient.getAgendamentos({ status: 'agendado' }).catch(() => []),
+        apiClient.getRadios({ signal }),
+        apiClient.getAgendamentos({ status: 'agendado' }, { signal }).catch((error) => {
+          if (error?.name === 'AbortError') throw error
+          return []
+        }),
       ])
       setRadios(radiosData || [])
       const agSet = new Set((agData || []).map((ag) => ag.radio_id))
       setScheduledRadioIds(agSet)
     } catch (error) {
+      if (error?.name === 'AbortError') return
       toast({ title: 'Erro ao buscar radios', description: error.message, variant: 'destructive' })
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [toast])
 
   useEffect(() => {
-    fetchRadios()
+    const controller = new AbortController()
+    fetchRadios(controller.signal)
+    return () => controller.abort()
   }, [fetchRadios])
+
+  useRevalidateOnFocus(() => {
+    fetchRadios()
+  })
 
   useEffect(() => {
     const url = formData.stream_url.trim()

@@ -12,6 +12,7 @@ import { Helmet } from 'react-helmet';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useLocation } from 'react-router-dom';
+import useRevalidateOnFocus from '@/hooks/useRevalidateOnFocus';
 import { Play, Pause, Download, Trash2, Clock, FileArchive, FileText, Mic, Filter, ListFilter, CalendarDays, MapPin, XCircle, Loader, Square, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Copy, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -1592,15 +1593,16 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
 
 
-  const fetchRadios = useCallback(async () => {
+  const fetchRadios = useCallback(async (signal) => {
 
     try {
 
-      const data = await apiClient.getRadios();
+      const data = await apiClient.getRadios({ signal });
 
       setRadios(data || []);
 
     } catch (error) {
+      if (error?.name === 'AbortError') return;
 
       toast({ title: 'Erro ao buscar rádios', description: error.message, variant: 'destructive' });
 
@@ -1608,20 +1610,22 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
   }, [toast]);
 
-  const fetchTags = useCallback(async () => {
+  const fetchTags = useCallback(async (signal) => {
     try {
-      const data = await apiClient.getTags();
+      const data = await apiClient.getTags({ signal });
       setAvailableTags(data || []);
     } catch (error) {
+      if (error?.name === 'AbortError') return;
       toast({ title: 'Erro ao buscar tags', description: error.message, variant: 'destructive' });
     }
   }, [toast]);
 
-  const fetchAgendamentos = useCallback(async () => {
+  const fetchAgendamentos = useCallback(async (signal) => {
     try {
-      const data = await apiClient.getAgendamentos();
+      const data = await apiClient.getAgendamentos({}, { signal });
       setAgendamentos(data || []);
     } catch (error) {
+      if (error?.name === 'AbortError') return;
       if (process.env.NODE_ENV === 'development') {
         console.error('Erro ao buscar agendamentos', error);
       }
@@ -1630,7 +1634,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
 
 
-  const fetchGravacoes = useCallback(async () => {
+  const fetchGravacoes = useCallback(async (signal) => {
     const requestId = ++fetchIdRef.current;
     if (!hasLoadedOnceRef.current) {
       setLoading(true);
@@ -1667,7 +1671,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
         page: currentPage,
         perPage: ITEMS_PER_PAGE,
         includeStats: shouldFetchStats,
-      });
+      }, { signal });
 
       if (requestId !== fetchIdRef.current) return;
 
@@ -1687,6 +1691,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
       hasLoadedOnceRef.current = true;
     } catch (error) {
       if (requestId !== fetchIdRef.current) return;
+      if (error?.name === 'AbortError') return;
       if (!hasLoadedOnceRef.current) {
         toast({ title: 'Erro ao buscar gravações', description: error.message, variant: 'destructive' });
       } else if (process.env.NODE_ENV === 'development') {
@@ -1702,20 +1707,33 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
 
   useEffect(() => {
-
-    fetchRadios();
-
+    const controller = new AbortController();
+    fetchRadios(controller.signal);
+    return () => controller.abort();
   }, [fetchRadios]);
 
   useEffect(() => {
-    fetchTags();
+    const controller = new AbortController();
+    fetchTags(controller.signal);
+    return () => controller.abort();
   }, [fetchTags]);
 
   useEffect(() => {
     let timer;
-    fetchAgendamentos();
-    timer = setInterval(fetchAgendamentos, 60000);
-    return () => clearInterval(timer);
+    let controller = new AbortController();
+
+    const runFetch = () => {
+      controller.abort();
+      controller = new AbortController();
+      fetchAgendamentos(controller.signal);
+    };
+
+    runFetch();
+    timer = setInterval(runFetch, 60000);
+    return () => {
+      controller.abort();
+      clearInterval(timer);
+    };
   }, [fetchAgendamentos]);
 
   useEffect(() => {
@@ -1727,9 +1745,9 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
 
   useEffect(() => {
-
-    fetchGravacoes();
-
+    const controller = new AbortController();
+    fetchGravacoes(controller.signal);
+    return () => controller.abort();
   }, [fetchGravacoes]);
 
   useEffect(() => {
@@ -1776,15 +1794,19 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
     let cancelled = false;
     let inFlight = false;
     let timer = null;
+    let currentController = null;
     const fetchOngoing = async () => {
       if (cancelled || inFlight) return;
       inFlight = true;
       setLoadingOngoing(true);
+      currentController?.abort();
+      currentController = new AbortController();
       try {
-        const data = await apiClient.getOngoingRecordings();
+        const data = await apiClient.getOngoingRecordings({ signal: currentController.signal });
         if (cancelled) return;
         setOngoingLive(data || []);
       } catch (error) {
+        if (error?.name === 'AbortError') return;
         if (process.env.NODE_ENV === 'development') {
           console.error('Erro ao buscar gravações em andamento', error);
         }
@@ -1799,9 +1821,25 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
     fetchOngoing();
     return () => {
       cancelled = true;
+      currentController?.abort();
       if (timer) clearTimeout(timer);
     };
   }, [activeTab]);
+
+  useRevalidateOnFocus(() => {
+    fetchRadios();
+    fetchTags();
+    fetchAgendamentos();
+    fetchGravacoes();
+    if (activeTab === 'live') {
+      apiClient.getOngoingRecordings()
+        .then((data) => setOngoingLive(data || []))
+        .catch((error) => {
+          if (error?.name === 'AbortError' || process.env.NODE_ENV !== 'development') return;
+          console.error('Erro ao revalidar gravações em andamento', error);
+        });
+    }
+  });
 
   useEffect(() => {
     if (activeTab !== 'live') return;

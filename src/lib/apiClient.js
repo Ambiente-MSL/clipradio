@@ -1,46 +1,80 @@
 import { API_URL, WS_BASE_URL } from '@/lib/apiConfig';
 const envTimeout = Number(import.meta.env.VITE_API_TIMEOUT_MS);
 const DEFAULT_TIMEOUT_MS = Number.isFinite(envTimeout) && envTimeout > 0 ? envTimeout : 25000;
+const AUTH_TOKEN_KEY = 'auth_token';
+
+const getStoredToken = () => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+};
 
 class ApiClient {
   constructor() {
     this.baseURL = API_URL;
-    this.token = localStorage.getItem('auth_token');
+    this.token = getStoredToken();
   }
 
   setToken(token) {
     this.token = token;
     if (token) {
-      localStorage.setItem('auth_token', token);
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
     } else {
-      localStorage.removeItem('auth_token');
+      localStorage.removeItem(AUTH_TOKEN_KEY);
     }
   }
 
+  syncTokenFromStorage() {
+    const storedToken = getStoredToken();
+    if (storedToken !== this.token) {
+      this.token = storedToken;
+    }
+    return this.token;
+  }
+
   async request(endpoint, options = {}) {
-    const { timeoutMs = DEFAULT_TIMEOUT_MS, headers: customHeaders, ...fetchOptions } = options;
+    const {
+      timeoutMs = DEFAULT_TIMEOUT_MS,
+      headers: customHeaders,
+      signal: externalSignal,
+      ...fetchOptions
+    } = options;
     const url = `${this.baseURL}${endpoint}`;
     const headers = {
       'Content-Type': 'application/json',
       ...customHeaders,
     };
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    const token = this.syncTokenFromStorage();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
     const controller = new AbortController();
     let timeoutId = null;
+    let timeoutTriggered = false;
     const resolvedTimeoutMs = Number.isFinite(Number(timeoutMs)) && Number(timeoutMs) > 0
       ? Number(timeoutMs)
       : DEFAULT_TIMEOUT_MS;
+    const abortFromExternalSignal = () => {
+      controller.abort(externalSignal?.reason);
+    };
+    if (externalSignal) {
+      if (externalSignal.aborted) {
+        abortFromExternalSignal();
+      } else {
+        externalSignal.addEventListener('abort', abortFromExternalSignal, { once: true });
+      }
+    }
     const clearRequestTimeout = () => {
       if (timeoutId) {
         clearTimeout(timeoutId);
         timeoutId = null;
       }
     };
-    timeoutId = setTimeout(() => controller.abort(), resolvedTimeoutMs);
+    timeoutId = setTimeout(() => {
+      timeoutTriggered = true;
+      controller.abort(new DOMException('Timeout exceeded', 'AbortError'));
+    }, resolvedTimeoutMs);
 
     try {
       const response = await fetch(url, {
@@ -62,6 +96,9 @@ class ApiClient {
       return data;
     } catch (error) {
       if (error?.name === 'AbortError' || error?.code === 20) {
+        if (!timeoutTriggered) {
+          throw error;
+        }
         const err = new Error('Tempo de resposta excedido. Tente novamente.');
         err.code = 'TIMEOUT';
         throw err;
@@ -75,6 +112,7 @@ class ApiClient {
       throw error;
     } finally {
       clearRequestTimeout();
+      externalSignal?.removeEventListener?.('abort', abortFromExternalSignal);
     }
   }
 
@@ -101,8 +139,8 @@ class ApiClient {
     return data;
   }
 
-  async getMe() {
-    return this.request('/auth/me');
+  async getMe(options = {}) {
+    return this.request('/auth/me', options);
   }
 
   async logout() {
@@ -111,8 +149,8 @@ class ApiClient {
   }
 
   // ============ RADIOS ============
-  async getRadios() {
-    return this.request('/radios');
+  async getRadios(options = {}) {
+    return this.request('/radios', options);
   }
 
   async getRadio(id) {
@@ -140,7 +178,7 @@ class ApiClient {
   }
 
   // ============ GRAVACOES ============
-  async getGravacoes(filters = {}) {
+  async getGravacoes(filters = {}, options = {}) {
     const params = new URLSearchParams();
     if (filters.radioId) params.append('radio_id', filters.radioId);
     if (filters.data) params.append('data', filters.data);
@@ -155,7 +193,7 @@ class ApiClient {
     if (filters.includeStats) params.append('include_stats', 'true');
     
     const query = params.toString();
-    return this.request(`/gravacoes${query ? `?${query}` : ''}`);
+    return this.request(`/gravacoes${query ? `?${query}` : ''}`, options);
   }
 
   async getGravacao(id) {
@@ -207,13 +245,13 @@ class ApiClient {
     return this.request('/gravacoes/stats');
   }
 
-  async getAdminQuickStats() {
-    return this.request('/gravacoes/admin/quick-stats');
+  async getAdminQuickStats(options = {}) {
+    return this.request('/gravacoes/admin/quick-stats', options);
   }
 
   // ============ ADMIN ============
-  async getAdminUsers() {
-    return this.request('/admin/users');
+  async getAdminUsers(options = {}) {
+    return this.request('/admin/users', options);
   }
 
   async createAdminUser(data) {
@@ -236,8 +274,8 @@ class ApiClient {
     });
   }
 
-  async getAdminClients() {
-    return this.request('/admin/clients');
+  async getAdminClients(options = {}) {
+    return this.request('/admin/clients', options);
   }
 
   async createAdminClient(data) {
@@ -261,12 +299,12 @@ class ApiClient {
   }
 
   // ============ AGENDAMENTOS ============
-  async getAgendamentos(filters = {}) {
+  async getAgendamentos(filters = {}, options = {}) {
     const params = new URLSearchParams();
     if (filters.status) params.append('status', filters.status);
     if (filters.limit != null) params.append('limit', filters.limit);
     const query = params.toString();
-    return this.request(`/agendamentos${query ? `?${query}` : ''}`);
+    return this.request(`/agendamentos${query ? `?${query}` : ''}`, options);
   }
 
   async getAgendamento(id) {
@@ -309,8 +347,9 @@ class ApiClient {
     }
     const url = `${this.baseURL}/agendamentos/report?${params.toString()}`;
     const headers = {};
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    const token = this.syncTokenFromStorage();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
     const response = await fetch(url, { headers });
     if (!response.ok) {
@@ -325,8 +364,8 @@ class ApiClient {
   }
 
   // ============ TAGS ============
-  async getTags() {
-    return this.request('/tags');
+  async getTags(options = {}) {
+    return this.request('/tags', options);
   }
 
   async getTag(id) {
@@ -387,8 +426,8 @@ class ApiClient {
     });
   }
 
-  async getOngoingRecordings() {
-    return this.request('/gravacoes/ongoing', { timeoutMs: 10000 });
+  async getOngoingRecordings(options = {}) {
+    return this.request('/gravacoes/ongoing', { timeoutMs: 10000, ...options });
   }
 
   async processAudioWithAI(gravacaoId, palavrasChave) {
@@ -437,7 +476,7 @@ class ApiClient {
 const apiClient = new ApiClient();
 
 // Inicializar token se existir
-const savedToken = localStorage.getItem('auth_token');
+const savedToken = getStoredToken();
 if (savedToken) {
   apiClient.setToken(savedToken);
 }

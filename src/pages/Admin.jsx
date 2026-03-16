@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Users, UserPlus, Pencil, Trash2, RefreshCw } from 'lucide-react';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import useRevalidateOnFocus from '@/hooks/useRevalidateOnFocus';
 
 const emptyUserForm = {
   email: '',
@@ -42,28 +43,20 @@ const Admin = () => {
   const [savingUser, setSavingUser] = useState(false);
   const [savingClient, setSavingClient] = useState(false);
 
-  useEffect(() => {
-    if (loading) return;
-    if (!user?.is_admin) {
-      navigate('/dashboard', { replace: true });
-      return;
-    }
-    fetchData();
-  }, [loading, navigate, user]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async (signal) => {
     if (!user?.is_admin) return;
     setIsLoading(true);
     try {
       const [usersData, clientsData, radiosData] = await Promise.all([
-        apiClient.getAdminUsers(),
-        apiClient.getAdminClients(),
-        apiClient.getRadios(),
+        apiClient.getAdminUsers({ signal }),
+        apiClient.getAdminClients({ signal }),
+        apiClient.getRadios({ signal }),
       ]);
       setUsers(usersData || []);
       setClients(clientsData || []);
       setRadios(radiosData || []);
     } catch (error) {
+      if (error?.name === 'AbortError') return;
       toast({
         title: 'Falha ao carregar dados',
         description: error.message,
@@ -72,7 +65,23 @@ const Admin = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast, user]);
+
+  useEffect(() => {
+    if (loading) return undefined;
+    if (!user?.is_admin) {
+      navigate('/dashboard', { replace: true });
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    fetchData(controller.signal);
+    return () => controller.abort();
+  }, [fetchData, loading, navigate, user]);
+
+  useRevalidateOnFocus(() => {
+    fetchData();
+  }, { enabled: Boolean(user?.is_admin) && !loading });
 
   const clientById = useMemo(() => {
     const map = new Map();

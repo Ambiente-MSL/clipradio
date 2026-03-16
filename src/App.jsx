@@ -57,7 +57,7 @@ function App() {
               <Route path="/gravador-manual" element={<ProtectedRoute><GravadorManual /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/tags" element={<ProtectedRoute><Tags /></ProtectedRoute>} />
-              <Route path="/nuvem-palavras" element={<ProtectedRoute><NuvemPalavras /></ProtectedRoute>} />
+              <Route path="/nuvem-tags" element={<ProtectedRoute><NuvemPalavras /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
               <Route path="/status" element={<ProtectedRoute><SystemStatus /></ProtectedRoute>} />
               <Route path="*" element={<Navigate to="/dashboard" />} />

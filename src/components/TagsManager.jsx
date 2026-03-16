@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Tag as TagIcon, Plus, Edit, Trash2, Loader, X } from 'lucide-react';
+import useRevalidateOnFocus from '@/hooks/useRevalidateOnFocus';
 
 const predefinedColors = [
   '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e'
@@ -234,13 +235,14 @@ const TagsManager = ({ onTagsUpdated }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTag, setEditingTag] = useState(null);
 
-  const fetchTags = useCallback(async () => {
+  const fetchTags = useCallback(async (signal) => {
     if (!user) return;
     setLoading(true);
     try {
-      const data = await apiClient.getTags();
+      const data = await apiClient.getTags({ signal });
       setTags(data || []);
     } catch (error) {
+      if (error?.name === 'AbortError') return;
       toast({ variant: 'destructive', title: 'Erro ao buscar tags', description: error.message });
     } finally {
       setLoading(false);
@@ -248,8 +250,14 @@ const TagsManager = ({ onTagsUpdated }) => {
   }, [user, toast]);
 
   useEffect(() => {
-    fetchTags();
+    const controller = new AbortController();
+    fetchTags(controller.signal);
+    return () => controller.abort();
   }, [fetchTags]);
+
+  useRevalidateOnFocus(() => {
+    fetchTags();
+  }, { enabled: Boolean(user) });
 
   const handleSaveTag = async (tagData) => {
     const rawNames = Array.isArray(tagData?.nomes) ? tagData.nomes : [tagData?.nome];

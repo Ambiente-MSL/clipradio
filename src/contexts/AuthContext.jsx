@@ -1,25 +1,27 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import apiClient from '@/lib/apiClient';
 import { useToast } from '@/components/ui/use-toast';
 
 const AuthContext = createContext(undefined);
+const AUTH_TOKEN_KEY = 'auth_token';
+const AUTH_USER_KEY = 'auth_user';
 
 const loadCachedUser = () => {
   try {
-    const cachedUserRaw = localStorage.getItem('auth_user');
+    const cachedUserRaw = localStorage.getItem(AUTH_USER_KEY);
     if (!cachedUserRaw) return null;
     return JSON.parse(cachedUserRaw);
   } catch (error) {
-    localStorage.removeItem('auth_user');
+    localStorage.removeItem(AUTH_USER_KEY);
     return null;
   }
 };
 
 const saveCachedUser = (user) => {
   if (user) {
-    localStorage.setItem('auth_user', JSON.stringify(user));
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
   } else {
-    localStorage.removeItem('auth_user');
+    localStorage.removeItem(AUTH_USER_KEY);
   }
 };
 
@@ -28,54 +30,99 @@ export const AuthProvider = ({ children }) => {
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const sessionRequestIdRef = useRef(0);
+
+  const clearSession = useCallback(() => {
+    apiClient.setToken(null);
+    saveCachedUser(null);
+    setUser(null);
+  }, []);
+
+  const refreshSession = useCallback(async ({ background = false } = {}) => {
+    const requestId = ++sessionRequestIdRef.current;
+    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    const cachedUser = loadCachedUser();
+
+    apiClient.setToken(token || null);
+
+    if (cachedUser) {
+      setUser(cachedUser);
+      setLoading(false);
+    } else if (!background) {
+      setLoading(true);
+    }
+
+    if (!token) {
+      clearSession();
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const userData = await apiClient.getMe();
+      if (requestId !== sessionRequestIdRef.current) return;
+      setUser(userData);
+      saveCachedUser(userData);
+    } catch (err) {
+      if (requestId !== sessionRequestIdRef.current) return;
+
+      const status = err?.status;
+      const isTransient = err?.code === 'TIMEOUT' || err?.code === 'NETWORK' || err?.name === 'AbortError';
+      if (!isTransient) {
+        console.error('Erro ao obter sessao:', err);
+      }
+      if (status === 401 || status === 403) {
+        clearSession();
+      }
+    } finally {
+      if (requestId === sessionRequestIdRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [clearSession]);
 
   useEffect(() => {
-    let cancelled = false;
+    refreshSession();
+  }, [refreshSession]);
 
-    const getSession = async () => {
-      const token = localStorage.getItem('auth_token');
-      const cachedUser = loadCachedUser();
-      const hasCachedUser = Boolean(cachedUser);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return undefined;
+    }
 
-      if (cachedUser) {
-        setUser(cachedUser);
-        setLoading(false);
-      }
-      if (!token) {
-        setLoading(false);
+    let lastResumeAt = 0;
+    const resumeSession = () => {
+      const now = Date.now();
+      if (now - lastResumeAt < 1500) return;
+      lastResumeAt = now;
+      refreshSession({ background: true });
+    };
+
+    const handleStorage = (event) => {
+      if (event.key && ![AUTH_TOKEN_KEY, AUTH_USER_KEY].includes(event.key)) {
         return;
       }
+      resumeSession();
+    };
 
-      try {
-        const userData = await apiClient.getMe();
-        if (cancelled) return;
-        setUser(userData);
-        saveCachedUser(userData);
-      } catch (err) {
-        const status = err?.status;
-        const isTransient = err?.code === 'TIMEOUT' || err?.code === 'NETWORK';
-        if (!isTransient) {
-          console.error('Erro ao obter sessao:', err);
-        }
-        if (status === 401 || status === 403) {
-          localStorage.removeItem('auth_token');
-          saveCachedUser(null);
-          if (!cancelled) {
-            setUser(null);
-          }
-        }
-      } finally {
-        if (!cancelled && !hasCachedUser) {
-          setLoading(false);
-        }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        resumeSession();
       }
     };
 
-    getSession();
+    window.addEventListener('focus', resumeSession);
+    window.addEventListener('online', resumeSession);
+    window.addEventListener('storage', handleStorage);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
-      cancelled = true;
+      window.removeEventListener('focus', resumeSession);
+      window.removeEventListener('online', resumeSession);
+      window.removeEventListener('storage', handleStorage);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [refreshSession]);
 
   const signUp = useCallback(async (email, password, nome) => {
     try {
@@ -113,16 +160,17 @@ export const AuthProvider = ({ children }) => {
   const signOut = useCallback(async () => {
     try {
       await apiClient.logout();
-      setUser(null);
-      saveCachedUser(null);
     } catch (error) {
       toast({
         variant: 'destructive',
         title: 'Erro ao sair',
         description: error.message || 'Algo deu errado.',
       });
+    } finally {
+      clearSession();
+      setLoading(false);
     }
-  }, [toast]);
+  }, [clearSession, toast]);
 
   const value = useMemo(() => ({
     user,
