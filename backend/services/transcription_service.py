@@ -390,6 +390,34 @@ def get_transcription_segments(gravacao_id):
     return segments if isinstance(segments, list) else []
 
 
+def _transcription_changed(
+    gravacao,
+    *,
+    status,
+    texto,
+    erro,
+    idioma,
+    modelo,
+    progresso,
+    cancelada,
+):
+    if gravacao.transcricao_status != status:
+        return True
+    if texto is not None and gravacao.transcricao_texto != texto:
+        return True
+    if gravacao.transcricao_erro != erro:
+        return True
+    if idioma is not None and gravacao.transcricao_idioma != idioma:
+        return True
+    if modelo is not None and gravacao.transcricao_modelo != modelo:
+        return True
+    if progresso is not None and gravacao.transcricao_progresso != progresso:
+        return True
+    if cancelada is not None and gravacao.transcricao_cancelada != cancelada:
+        return True
+    return False
+
+
 def _commit_transcription(
     gravacao,
     *,
@@ -401,6 +429,17 @@ def _commit_transcription(
     progresso=None,
     cancelada=None,
 ):
+    if not _transcription_changed(
+        gravacao,
+        status=status,
+        texto=texto,
+        erro=erro,
+        idioma=idioma,
+        modelo=modelo,
+        progresso=progresso,
+        cancelada=cancelada,
+    ):
+        return False
     gravacao.transcricao_status = status
     gravacao.transcricao_erro = erro
     if texto is not None:
@@ -422,6 +461,7 @@ def _commit_transcription(
         )
     except Exception:
         pass
+    return True
 
 
 def _update_progress(gravacao, progresso):
@@ -575,6 +615,7 @@ def transcribe_gravacao(gravacao_id, *, force=False):
         last_progress = gravacao.transcricao_progresso or 0
         last_text_end = 0.0
         text_update_seconds = max(1, int(Config.TRANSCRIBE_TEXT_UPDATE_SECONDS or 10))
+        progress_step = max(1, int(Config.TRANSCRIBE_PROGRESS_STEP or 5))
 
         _commit_transcription(
             gravacao,
@@ -618,7 +659,9 @@ def transcribe_gravacao(gravacao_id, *, force=False):
                 progress = min(99, last_progress + 1)
 
             text_update = segment_end and (segment_end - last_text_end) >= text_update_seconds
-            progress_update = progress > last_progress
+            progress_update = progress > last_progress and (
+                (progress - last_progress) >= progress_step or progress >= 99
+            )
             if progress_update or text_update:
                 texto_parcial = " ".join(parts).strip() if text_update else None
                 _commit_transcription(

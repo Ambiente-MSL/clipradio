@@ -100,6 +100,13 @@ const canDownloadAudio = (gravacao) => (
   Boolean(gravacao?.arquivo_url || gravacao?.arquivo_nome) && gravacao?.audio_can_download !== false
 );
 
+const TRANSCRIPTION_PREVIEW_MAX_CHARS = 12000;
+const TRANSCRIPTION_STATUS_POLL_MS = 5000;
+const BACKGROUND_TRANSCRIPTION_STATUS_POLL_MS = 15000;
+const LIVE_ONGOING_POLL_MS = 8000;
+const BACKGROUND_ONGOING_POLL_MS = 20000;
+const AGENDAMENTOS_POLL_MS = 90000;
+
 const getAudioAvailabilityMessage = (gravacao) => {
   const days = Number(gravacao?.audio_stream_max_age_days);
   if (Number.isFinite(days) && days >= 0) {
@@ -109,6 +116,21 @@ const getAudioAvailabilityMessage = (gravacao) => {
 };
 
 const escapeRegExp = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const isDocumentVisible = () => (
+  typeof document === 'undefined' || document.visibilityState === 'visible'
+);
+
+const buildTranscriptionPreview = (text, maxChars = TRANSCRIPTION_PREVIEW_MAX_CHARS) => {
+  const normalized = String(text || '');
+  if (normalized.length <= maxChars) return normalized;
+  const preview = normalized.slice(0, maxChars);
+  const lastWhitespace = preview.lastIndexOf(' ');
+  const trimmedPreview = lastWhitespace > maxChars * 0.8
+    ? preview.slice(0, lastWhitespace)
+    : preview;
+  return `${trimmedPreview.trimEnd()}...`;
+};
+
 const hexToRgb = (value) => {
   const normalized = String(value || '').trim();
   if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(normalized)) {
@@ -511,6 +533,17 @@ const GravacaoItem = ({
     if (!gravacao?.id) return;
     if (onOpenTranscription) {
       onOpenTranscription(gravacao.id);
+    }
+
+    const normalizedStatus = String(transcriptionData.status || '').toLowerCase();
+    const hasCachedPayload = Boolean(transcriptionData.texto)
+      || Boolean(transcriptionData.erro)
+      || normalizedStatus === 'interrompido';
+    const shouldRefreshFromApi = !hasCachedPayload
+      || ['processando', 'interrompendo', 'fila'].includes(normalizedStatus);
+    if (!shouldRefreshFromApi) {
+      setIsTranscriptionLoading(false);
+      return;
     }
 
     setIsTranscriptionLoading(true);
@@ -1017,6 +1050,7 @@ const GravacaoItem = ({
     if (!['processando', 'interrompendo', 'fila'].includes(transcriptionData.status)) return;
     let active = true;
     const fetchStatus = async () => {
+      if (!isDocumentVisible()) return;
       try {
         const data = await apiClient.getTranscricao(gravacao.id);
         if (!active) return;
@@ -1028,7 +1062,10 @@ const GravacaoItem = ({
       }
     };
     fetchStatus();
-    const timer = setInterval(fetchStatus, 3000);
+    const timer = setInterval(() => {
+      if (!isDocumentVisible()) return;
+      fetchStatus();
+    }, TRANSCRIPTION_STATUS_POLL_MS);
     return () => {
       active = false;
       clearInterval(timer);
@@ -1146,8 +1183,15 @@ const GravacaoItem = ({
     || normalizedTranscriptionProgress >= 100
     || transcriptionData.status === 'concluido'
     || gravacao?.transcricao_status === 'concluido';
+  const transcriptionText = transcriptionData.texto || '';
+  const transcriptionPreview = useMemo(
+    () => buildTranscriptionPreview(transcriptionText),
+    [transcriptionText]
+  );
+  const hasCollapsedPreview = transcriptionPreview.length < transcriptionText.length;
+  const shouldRenderFullTranscription = isTranscriptionExpanded || Boolean(activeTagId);
   const matchedTags = useMemo(() => {
-    const text = transcriptionData.texto || '';
+    const text = transcriptionText;
     if (!text) return [];
     return (availableTags || []).filter((tag) => {
       const label = tag?.nome ? String(tag.nome).trim() : '';
@@ -1157,7 +1201,7 @@ const GravacaoItem = ({
       const regex = new RegExp(`\\b${escapedLabel}\\b`, 'i');
       return regex.test(text);
     });
-  }, [availableTags, transcriptionData.texto]);
+  }, [availableTags, transcriptionText]);
 
   const activeTag = useMemo(
     () => (matchedTags || []).find((tag) => tag.id === activeTagId) || null,
@@ -1176,7 +1220,7 @@ const GravacaoItem = ({
     }
   }, [activeTagId, matchedTags]);
   const highlightedTranscription = useMemo(() => {
-    const text = transcriptionData.texto || '';
+    const text = shouldRenderFullTranscription ? transcriptionText : transcriptionPreview;
     const label = activeTag?.nome ? String(activeTag.nome).trim() : '';
     if (!text || !label) return text;
     const escapedLabel = escapeRegExp(label);
@@ -1259,7 +1303,7 @@ const GravacaoItem = ({
       nodes.push(text.slice(lastIndex));
     }
     return nodes;
-  }, [transcriptionData.texto, activeTag, transcriptionSegments]);
+  }, [activeTag, shouldRenderFullTranscription, transcriptionPreview, transcriptionSegments, transcriptionText]);
 
   useEffect(() => {
     if (!isTranscriptionOpen) return;
@@ -1481,7 +1525,14 @@ const GravacaoItem = ({
                 Parando transcrição...
               </div>
             ) : transcriptionData.texto ? (
-              <p className="whitespace-pre-wrap leading-relaxed">{highlightedTranscription}</p>
+              <>
+                {hasCollapsedPreview && !shouldRenderFullTranscription ? (
+                  <div className="mb-3 text-xs text-slate-400">
+                    Exibindo uma previa da transcricao para abrir mais rapido. Clique em Expandir texto para carregar tudo.
+                  </div>
+                ) : null}
+                <p className="whitespace-pre-wrap leading-relaxed">{highlightedTranscription}</p>
+              </>
             ) : isTranscriptionLoading ? (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader className="w-4 h-4 animate-spin" />
@@ -1719,20 +1770,29 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
   }, [fetchTags]);
 
   useEffect(() => {
+    let cancelled = false;
     let timer;
     let controller = new AbortController();
 
-    const runFetch = () => {
+    const runFetch = async () => {
+      if (cancelled) return;
+      if (!isDocumentVisible()) {
+        timer = setTimeout(runFetch, AGENDAMENTOS_POLL_MS);
+        return;
+      }
       controller.abort();
       controller = new AbortController();
-      fetchAgendamentos(controller.signal);
+      await fetchAgendamentos(controller.signal);
+      if (!cancelled) {
+        timer = setTimeout(runFetch, AGENDAMENTOS_POLL_MS);
+      }
     };
 
     runFetch();
-    timer = setInterval(runFetch, 60000);
     return () => {
+      cancelled = true;
       controller.abort();
-      clearInterval(timer);
+      if (timer) clearTimeout(timer);
     };
   }, [fetchAgendamentos]);
 
@@ -1797,6 +1857,10 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
     let currentController = null;
     const fetchOngoing = async () => {
       if (cancelled || inFlight) return;
+      if (!isDocumentVisible()) {
+        timer = setTimeout(fetchOngoing, BACKGROUND_ONGOING_POLL_MS);
+        return;
+      }
       inFlight = true;
       setLoadingOngoing(true);
       currentController?.abort();
@@ -1814,7 +1878,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
         setLoadingOngoing(false);
         inFlight = false;
         if (!cancelled) {
-          timer = setTimeout(fetchOngoing, 5000);
+          timer = setTimeout(fetchOngoing, LIVE_ONGOING_POLL_MS);
         }
       }
     };

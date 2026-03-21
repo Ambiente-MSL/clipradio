@@ -21,11 +21,19 @@ const adminNavItems = [
   { name: 'Admin', path: '/admin', icon: Shield },
 ];
 
+const NAVBAR_ONGOING_OPEN_POLL_MS = 5000;
+const NAVBAR_ONGOING_IDLE_POLL_MS = 15000;
+const NAVBAR_ONGOING_BACKGROUND_POLL_MS = 30000;
+
 const parseTimestamp = (value) => {
   if (!value) return null;
   const ms = new Date(value).getTime();
   return Number.isNaN(ms) ? null : ms;
 };
+
+const isDocumentVisible = () => (
+  typeof document === 'undefined' || document.visibilityState === 'visible'
+);
 
 const formatProgressTime = (seconds) => {
   if (!Number.isFinite(seconds) || seconds < 0) return '--:--';
@@ -148,6 +156,10 @@ const Navbar = () => {
 
     const fetchOngoing = async () => {
       if (cancelled || inFlight) return;
+      if (!isDocumentVisible()) {
+        timer = setTimeout(fetchOngoing, NAVBAR_ONGOING_BACKGROUND_POLL_MS);
+        return;
+      }
       inFlight = true;
       try {
         const data = await apiClient.getOngoingRecordings();
@@ -159,7 +171,10 @@ const Navbar = () => {
       } finally {
         inFlight = false;
         if (!cancelled) {
-          timer = setTimeout(fetchOngoing, 5000);
+          const nextDelay = showRecordingPanel
+            ? NAVBAR_ONGOING_OPEN_POLL_MS
+            : NAVBAR_ONGOING_IDLE_POLL_MS;
+          timer = setTimeout(fetchOngoing, nextDelay);
         }
       }
     };
@@ -169,7 +184,7 @@ const Navbar = () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [user]);
+  }, [showRecordingPanel, user]);
 
   const handleSignOut = async () => {
     await signOut();
