@@ -70,7 +70,25 @@ def _parse_iso_datetime(value):
     except Exception:
         return None
 
-def _apply_gravacoes_filters(query, *, user_id, is_admin, radio_id=None, data_filter=None, cidade=None, estado=None, status=None, tipo=None):
+def _parse_csv_values(value):
+    if not value:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        raw_values = value
+    else:
+        raw_values = str(value).split(',')
+    values = []
+    seen = set()
+    for item in raw_values:
+        normalized = str(item or '').strip().lower()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        values.append(normalized)
+    return values
+
+
+def _apply_gravacoes_filters(query, *, user_id, is_admin, radio_id=None, data_filter=None, cidade=None, estado=None, status=None, tipo=None, transcricao_status=None):
     if not is_admin:
         query = query.filter(Gravacao.user_id == user_id)
 
@@ -82,6 +100,10 @@ def _apply_gravacoes_filters(query, *, user_id, is_admin, radio_id=None, data_fi
 
     if tipo:
         query = query.filter(Gravacao.tipo == tipo)
+
+    transcricao_status_values = _parse_csv_values(transcricao_status)
+    if transcricao_status_values:
+        query = query.filter(db.func.lower(Gravacao.transcricao_status).in_(transcricao_status_values))
 
     if data_filter:
         try:
@@ -168,6 +190,7 @@ def get_gravacoes():
     estado = (request.args.get('estado') or '').strip() or None
     status = (request.args.get('status') or '').strip() or None
     tipo = (request.args.get('tipo') or '').strip() or None
+    transcricao_status = request.args.get('transcricao_status')
 
     # Paginacao
     limit_arg = request.args.get('limit')
@@ -199,6 +222,7 @@ def get_gravacoes():
         estado=estado,
         status=status,
         tipo=tipo,
+        transcricao_status=transcricao_status,
     )
 
     total = base_query.with_entities(db.func.count(Gravacao.id)).scalar() or 0
@@ -259,6 +283,7 @@ def get_gravacoes():
             estado,
             status,
             tipo,
+            transcricao_status,
         )
         cached = _get_cached_stats(cache_key)
         if cached:
@@ -281,6 +306,7 @@ def get_gravacoes():
                 estado=estado,
                 status=status,
                 tipo=tipo,
+                transcricao_status=transcricao_status,
             )
             stats_row = stats_query.first() or (0, 0, 0)
             stats = {

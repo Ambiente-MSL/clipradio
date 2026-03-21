@@ -186,6 +186,12 @@ class ApiClient {
     if (filters.estado) params.append('estado', filters.estado);
     if (filters.status) params.append('status', filters.status);
     if (filters.tipo) params.append('tipo', filters.tipo);
+    if (filters.transcricaoStatus) {
+      const transcricaoStatus = Array.isArray(filters.transcricaoStatus)
+        ? filters.transcricaoStatus.join(',')
+        : filters.transcricaoStatus;
+      params.append('transcricao_status', transcricaoStatus);
+    }
     if (filters.page != null) params.append('page', filters.page);
     if (filters.perPage != null) params.append('per_page', filters.perPage);
     if (filters.limit != null) params.append('limit', filters.limit);

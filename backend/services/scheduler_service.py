@@ -74,6 +74,19 @@ def init_scheduler(app=None):
             agendamentos = Agendamento.query.filter_by(status='agendado').all()
             for agendamento in agendamentos:
                 schedule_agendamento(agendamento)
+            if app_obj.config.get("TRANSCRIBE_ENABLED") and app_obj.config.get("TRANSCRIBE_RECOVERY_ENABLED", True):
+                recover_pending_transcriptions_job()
+                scheduler.add_job(
+                    recover_pending_transcriptions_job,
+                    IntervalTrigger(
+                        seconds=max(
+                            15,
+                            int(app_obj.config.get("TRANSCRIBE_RECOVERY_INTERVAL_SECONDS") or 45),
+                        )
+                    ),
+                    id="transcribe_recovery",
+                    replace_existing=True,
+                )
             # Job periÛdico para limpar agendamentos travados em execuÓÐo
             scheduler.add_job(
                 cleanup_agendamentos_stuck,
@@ -91,6 +104,27 @@ def init_scheduler(app=None):
                 )
     except Exception as e:
         print(f"Erro ao carregar agendamentos: {e}")
+    finally:
+        _safe_session_remove(app_obj)
+
+
+def recover_pending_transcriptions_job():
+    app_obj = _capture_scheduler_app()
+    if not app_obj:
+        return
+
+    try:
+        with app_obj.app_context():
+            from services.transcription_service import recover_pending_transcriptions
+
+            recover_pending_transcriptions(
+                limit=max(1, int(app_obj.config.get("TRANSCRIBE_RECOVERY_BATCH_SIZE") or 5))
+            )
+    except Exception as e:
+        try:
+            print(f"recover_pending_transcriptions_job falhou: {e}")
+        except Exception:
+            pass
     finally:
         _safe_session_remove(app_obj)
 

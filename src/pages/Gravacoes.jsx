@@ -106,6 +106,7 @@ const BACKGROUND_TRANSCRIPTION_STATUS_POLL_MS = 15000;
 const LIVE_ONGOING_POLL_MS = 8000;
 const BACKGROUND_ONGOING_POLL_MS = 20000;
 const AGENDAMENTOS_POLL_MS = 90000;
+const TRANSCRIPTION_QUEUE_STATUSES = ['fila', 'processando', 'interrompendo'];
 
 const getAudioAvailabilityMessage = (gravacao) => {
   const days = Number(gravacao?.audio_stream_max_age_days);
@@ -1596,7 +1597,6 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
   const [filters, setFilters] = useState({ radioId: initialRadioId, data: '', cidade: '', estado: '' });
   const [currentPlayingId, setCurrentPlayingId] = useState(null);
   const [openTranscriptionId, setOpenTranscriptionId] = useState(null);
-  const autoTranscriptionStartedRef = useRef(new Set());
   const fetchIdRef = useRef(0);
   const hasLoadedOnceRef = useRef(false);
   const lastStatsKeyRef = useRef(null);
@@ -1693,7 +1693,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
       setIsRefreshing(true);
     }
 
-    const statusFilter = activeTab === 'all' || activeTab === 'agendados' || activeTab === 'manuais'
+    const statusFilter = activeTab === 'all' || activeTab === 'agendados' || activeTab === 'manuais' || activeTab === 'transcricoes'
       ? 'concluido'
       : undefined;
     const tipoFilter = activeTab === 'agendados'
@@ -1701,6 +1701,9 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
       : activeTab === 'manuais'
         ? 'manual'
         : undefined;
+    const transcricaoStatusFilter = activeTab === 'transcricoes'
+      ? TRANSCRIPTION_QUEUE_STATUSES
+      : undefined;
     const statsKey = JSON.stringify({
       radioId: filters.radioId,
       data: filters.data,
@@ -1708,6 +1711,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
       estado: filters.estado,
       status: statusFilter,
       tipo: tipoFilter,
+      transcricaoStatus: transcricaoStatusFilter,
     });
     const shouldFetchStats = statsKey !== lastStatsKeyRef.current;
 
@@ -1719,6 +1723,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
         estado: filters.estado,
         status: statusFilter,
         tipo: tipoFilter,
+        transcricaoStatus: transcricaoStatusFilter,
         page: currentPage,
         perPage: ITEMS_PER_PAGE,
         includeStats: shouldFetchStats,
@@ -1809,45 +1814,6 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
     fetchGravacoes(controller.signal);
     return () => controller.abort();
   }, [fetchGravacoes]);
-
-  useEffect(() => {
-    if (!gravacoes || gravacoes.length === 0) return;
-    const now = new Date();
-    const startOfTodayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const candidates = gravacoes.filter((gravacao) => {
-      if (!gravacao?.id) return false;
-      if (autoTranscriptionStartedRef.current.has(gravacao.id)) return false;
-      if (String(gravacao.status || '').toLowerCase() !== 'concluido') return false;
-      const createdAtMs = new Date(gravacao.criado_em || 0).getTime();
-      if (!Number.isFinite(createdAtMs) || createdAtMs < startOfTodayMs) return false;
-      if (!gravacao.arquivo_url && !gravacao.arquivo_nome) return false;
-      const transStatus = String(gravacao.transcricao_status || '').toLowerCase();
-      if (transStatus) return false;
-      if (gravacao.transcricao_disponivel) return false;
-      if (gravacao.transcricao_cancelada) return false;
-      return true;
-    });
-    if (candidates.length === 0) return;
-
-    let cancelled = false;
-    const startTranscriptions = async () => {
-      for (const gravacao of candidates) {
-        if (cancelled) return;
-        autoTranscriptionStartedRef.current.add(gravacao.id);
-        try {
-          await apiClient.startTranscricao(gravacao.id, { force: false });
-        } catch (error) {
-          if (process.env.NODE_ENV === 'development') {
-            console.error('Erro ao iniciar transcrição automática', error);
-          }
-        }
-      }
-    };
-    startTranscriptions();
-    return () => {
-      cancelled = true;
-    };
-  }, [gravacoes]);
 
   useEffect(() => {
     if (activeTab !== 'live') return;
@@ -2126,6 +2092,13 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
       }),
     [concludedGravacoes]
   );
+  const transcriptionQueueGravacoes = useMemo(
+    () =>
+      gravacoes.filter((gravacao) => (
+        TRANSCRIPTION_QUEUE_STATUSES.includes(String(gravacao.transcricao_status || '').toLowerCase())
+      )),
+    [gravacoes]
+  );
   const scheduledOngoing = useMemo(() => {
     const activeStatuses = new Set(['em_execucao', 'gravando', 'iniciando']);
     return agendamentos
@@ -2171,6 +2144,7 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
 
   const paginatedScheduled = useMemo(() => getCurrentPageItems(scheduledGravacoes), [scheduledGravacoes]);
   const paginatedManual = useMemo(() => getCurrentPageItems(manualGravacoes), [manualGravacoes]);
+  const paginatedTranscriptions = useMemo(() => getCurrentPageItems(transcriptionQueueGravacoes), [transcriptionQueueGravacoes]);
   const paginatedConcluded = useMemo(() => getCurrentPageItems(concludedGravacoes), [concludedGravacoes]);
 
   // Resetar página quando mudar de aba ou filtros
@@ -2263,6 +2237,12 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
             <Button size="sm" variant={activeTab === 'manuais' ? 'default' : 'outline'} onClick={() => setActiveTab('manuais')}>
 
               Manuais
+
+            </Button>
+
+            <Button size="sm" variant={activeTab === 'transcricoes' ? 'default' : 'outline'} onClick={() => setActiveTab('transcricoes')}>
+
+              Transcrições
 
             </Button>
 
@@ -2556,6 +2536,68 @@ const Gravacoes = ({ setGlobalAudioTrack }) => {
                 <div className="space-y-4 my-4">
 
                   {paginatedManual.map((gravacao, index) => (
+
+                    <GravacaoItem
+
+                      key={gravacao.id}
+
+                      gravacao={gravacao}
+
+                      index={index}
+
+                      isPlaying={currentPlayingId === gravacao.id}
+
+                      onPlay={() => handlePlay(gravacao.id)}
+
+                      onStop={handleStop}
+
+                      setGlobalAudioTrack={setGlobalAudioTrack}
+
+                      availableTags={availableTags}
+
+                      openTranscriptionId={openTranscriptionId}
+
+                      onOpenTranscription={setOpenTranscriptionId}
+
+                      onDelete={handleDeleteLocal}
+
+                      isSelected={selectedIds.has(gravacao.id)}
+
+                      onToggleSelection={toggleSelection}
+
+                    />
+
+                  ))}
+
+                </div>
+
+                <PaginationControls />
+              </>
+
+            )
+
+          ) : activeTab === 'transcricoes' ? (
+
+            transcriptionQueueGravacoes.length === 0 ? (
+
+              <div className="card text-center py-12">
+
+                <XCircle className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+
+                <h3 className="text-2xl font-bold text-white mb-2">Nenhuma transcrição em andamento</h3>
+
+                <p className="text-muted-foreground">Itens em fila, processando ou interrompendo aparecem aqui para acompanhamento.</p>
+
+              </div>
+
+            ) : (
+
+              <>
+                <PaginationControls />
+
+                <div className="space-y-4 my-4">
+
+                  {paginatedTranscriptions.map((gravacao, index) => (
 
                     <GravacaoItem
 

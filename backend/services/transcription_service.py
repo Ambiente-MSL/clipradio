@@ -7,6 +7,7 @@ import threading
 from collections import Counter
 
 from flask import current_app, has_app_context
+from sqlalchemy import or_
 
 from app import db
 from config import Config
@@ -24,6 +25,7 @@ _TRANSCRIBE_IN_FLIGHT = Counter()
 _TRANSCRIBE_IN_FLIGHT_LOCK = threading.Lock()
 _TRANSCRIBE_ACTIVE = 0
 _TRANSCRIBE_ACTIVE_LOCK = threading.Lock()
+_RECOVERABLE_TRANSCRIPTION_STATUSES = ("fila", "processando")
 
 def _safe_session_remove(app_obj=None):
     """Fecha a sessão do SQLAlchemy com contexto ativo."""
@@ -43,6 +45,13 @@ def _get_transcribe_max_workers():
         return max(1, int(Config.TRANSCRIBE_MAX_CONCURRENT or 1))
     except Exception:
         return 1
+
+
+def _get_transcribe_recovery_batch_size():
+    try:
+        return max(1, int(Config.TRANSCRIBE_RECOVERY_BATCH_SIZE or 5))
+    except Exception:
+        return 5
 
 
 def _ensure_transcribe_workers():
@@ -741,8 +750,15 @@ def start_transcription(gravacao_id, *, force=False):
     if gravacao:
         if gravacao.transcricao_texto and not force:
             return True
-        if gravacao.transcricao_status == "processando" and not force:
+
+    _ensure_transcribe_workers()
+
+    with _TRANSCRIBE_IN_FLIGHT_LOCK:
+        if not force and _TRANSCRIBE_IN_FLIGHT.get(gravacao_id, 0) > 0:
             return True
+        _TRANSCRIBE_IN_FLIGHT[gravacao_id] += 1
+
+    if gravacao:
         with _TRANSCRIBE_ACTIVE_LOCK:
             active = _TRANSCRIBE_ACTIVE
         pending = _TRANSCRIBE_QUEUE.qsize()
@@ -763,19 +779,66 @@ def start_transcription(gravacao_id, *, force=False):
     except Exception:
         app_obj = None
 
-    _ensure_transcribe_workers()
-
-    with _TRANSCRIBE_IN_FLIGHT_LOCK:
-        if not force and _TRANSCRIBE_IN_FLIGHT.get(gravacao_id, 0) > 0:
-            return True
-        _TRANSCRIBE_IN_FLIGHT[gravacao_id] += 1
-
     _TRANSCRIBE_QUEUE.put({
         "gravacao_id": gravacao_id,
         "force": force,
         "app_obj": app_obj,
     })
     return True
+
+
+def recover_pending_transcriptions(limit=None):
+    if not Config.TRANSCRIBE_ENABLED:
+        return 0
+
+    batch_size = max(1, int(limit or _get_transcribe_recovery_batch_size()))
+    query = db.session.query(Gravacao.id).filter(Gravacao.status == "concluido")
+    query = query.filter(
+        or_(
+            Gravacao.transcricao_texto.is_(None),
+            Gravacao.transcricao_texto == "",
+        )
+    )
+    query = query.filter(
+        or_(
+            Gravacao.arquivo_nome.isnot(None),
+            Gravacao.arquivo_url.isnot(None),
+        )
+    )
+    query = query.filter(
+        or_(
+            Gravacao.transcricao_cancelada.is_(None),
+            Gravacao.transcricao_cancelada.is_(False),
+        )
+    )
+    query = query.filter(
+        or_(
+            Gravacao.transcricao_status.is_(None),
+            Gravacao.transcricao_status == "",
+            db.func.lower(Gravacao.transcricao_status).in_(_RECOVERABLE_TRANSCRIPTION_STATUSES),
+        )
+    )
+    gravacao_ids = [
+        row[0]
+        for row in query.order_by(Gravacao.criado_em.asc()).limit(batch_size).all()
+        if row and row[0]
+    ]
+
+    queued = 0
+    for gravacao_id in gravacao_ids:
+        try:
+            if start_transcription(gravacao_id, force=False):
+                queued += 1
+        except Exception:
+            if has_app_context():
+                try:
+                    current_app.logger.exception(
+                        "Falha ao recuperar transcricao pendente %s",
+                        gravacao_id,
+                    )
+                except Exception:
+                    pass
+    return queued
 
 
 def request_transcription_stop(gravacao_id):
